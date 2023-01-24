@@ -22,7 +22,7 @@ const mine = new MyClass('hello')
 
 console.log(JSON.stringify(mine));
 
-const worker = new Worker('./scratch2')
+const worker = new Worker('./worker1')
 
 worker.on("message", obj => {
     console.log('parent: ');
