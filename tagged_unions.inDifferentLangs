@@ -1,0 +1,44 @@
+*******  Elm     ****************************************
+
+
+type User
+  = Regular String Int
+  | Visitor String
+
+toName : User -> String
+toName user =
+  case user of
+    Regular name age ->
+      name
+
+    Visitor name ->
+      name
+
+
+
+*******  Typescript     ****************************************
+
+// Discriminated union using string literals
+interface Dog {
+    species: "canine";
+    woof: string;
+}
+interface Cat {
+    species: "feline";
+    meow: string;
+}
+type Pet = Dog | Cat;
+
+function meetPet(p: Pet) {
+    switch(p.species) {
+        case "canine":
+            console.log("Who's a good boy? " + p.woof);
+            break;
+        case "feline":
+            console.log("Pretty kitty: " + p.meow);
+            break;
+        default:
+            // Argument of type 'Fish' not assignable to 'never'
+            throwBadPet(p);
+    }
+}
