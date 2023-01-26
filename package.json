@@ -1,5 +1,8 @@
 {
   "type": "module",
+  "imports": {
+    "#mymod": "./import_modules/module1.js"
+  },
   "scripts": {
     "test": "mocha"
   },

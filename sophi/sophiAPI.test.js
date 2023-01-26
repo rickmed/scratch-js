@@ -11,7 +11,7 @@ const testsAPI2 = [
         }),
     ]),
     group('some module()', [
-        group('equals()', [ 
+        group('equals()', [
             test("#only pull()", (queue) => {
 
             }),
@@ -60,7 +60,7 @@ const tests2 = {
 }
 
 const tests3 = {
-    "#only pull()"(done) {
+    "#only pull()"({done}) {
         const prom = Promise.resolve('hey');
         prom.then(val => {
             assert(val, expected);
