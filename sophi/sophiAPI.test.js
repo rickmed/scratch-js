@@ -2,7 +2,7 @@
 import {test} from './sophi.mjs';
 
 const testsAPI2 = [
-    group('equals()', [   // describe =alias= group
+    topic('equals()', [   // describe =alias= topic
         test("#only pull()", (queue) => {
 
         }),
@@ -10,8 +10,8 @@ const testsAPI2 = [
 
         }),
     ]),
-    group('some module()', [
-        group('equals()', [
+    topic('some module()', [
+        topic('equals()', [
             test("#only pull()", (queue) => {
 
             }),
