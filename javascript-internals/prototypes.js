@@ -6,20 +6,18 @@ asigned as the prototype of instances created with that function
 when using ‘new’ ("" in String's case)
 */
 
-const StringConst_P = Object.getPrototypeOf(String)
+const proto = Object.getPrototypeOf
+
+const StringConst_P = proto(String)
 // String.protytype -> obj
-// getPrototypeOf(String) !== obj
 // getPrototypeOf(String) -> NativeCode
-// getPrototypeOf(strInstance) -> String.prototype -> obj
 
+const strInstance_P = proto("a")
+// true
+// console.log(getPrototypeOf("a") === String.prototype)
 
-// getPrototypeOf( String.prototype || getPrototypeOf("a") ) ->
-
-const strInstance_P = Object.getPrototypeOf("a")
-// console.log(strInstance_P === String.prototype)
-
-const strInstance_PP = Object.getPrototypeOf(strInstance_P)
-const StringConst_PP = Object.getPrototypeOf(StringConst_P)
+const strInstance_PP = proto(strInstance_P)
+const StringConst_PP = proto(StringConst_P)
 // true:
 // console.log(strInstance_PP == StringConst_PP)
 
@@ -27,5 +25,4 @@ const PP = StringConst_PP
 // console.log(Object.getOwnPropertyNames(PP))
 
 // null
-const root_P = Object.getPrototypeOf(PP)
-console.log(root_P)
+const root_P = proto(PP)
