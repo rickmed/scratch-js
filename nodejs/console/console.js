@@ -1,4 +1,3 @@
-
 const origWrite = process.stdout.write
 
 let logs = []
