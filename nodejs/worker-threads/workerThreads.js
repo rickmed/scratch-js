@@ -25,7 +25,7 @@ console.log(JSON.stringify(mine));
 const worker = new Worker('./nodejs/worker-threads/worker1.js')
 
 worker.on("message", obj => {
-    console.log('parent:');
+    console.log('parent: ');
     // reconstruct methods
     Object.setPrototypeOf(obj, MyClass.prototype);
     obj.hey()
