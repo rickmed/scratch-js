@@ -12,7 +12,6 @@ console.group()
 console.log("\x1b[31m  HOLA  \x1b[m")
 console.dir("\x1b[31m  HOLA  \x1b[m")
 console.groupEnd()
-// console.group()
 console.dir('DONE')
 
 
