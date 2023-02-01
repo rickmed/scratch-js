@@ -16,3 +16,4 @@ console.dir('DONE')
 process.stdout.write = origWrite
 
 console.dir(logs)
+	
