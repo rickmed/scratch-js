@@ -14,7 +14,6 @@ console.dir("\x1b[31m  HOLA  \x1b[m")
 console.groupEnd()
 console.dir('DONE')
 
-
 process.stdout.write = origWrite
 
 console.dir(logs)
