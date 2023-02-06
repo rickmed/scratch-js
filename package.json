@@ -2,12 +2,5 @@
   "type": "module",
   "imports": {
     "#mymod": "./import_modules/module1.js"
-  },
-  "dependencies": {
-    "colors": "^1.4.0",
-    "fast-glob": "^3.2.12",
-    "js-csp": "^1.0.1",
-    "preact": "^10.11.3",
-    "zod": "^3.20.2"
   }
 }
