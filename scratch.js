@@ -77,7 +77,21 @@ setColorsProto()
 
 
 import { inspect } from "node:util"
-import { util } from "zod"
+import Table from "cli-table3"
+
+
+const half = Math.floor(process.stdout.columns / 2) - 10
+// instantiate
+var table = new Table({
+	wordWrap: true,
+	style: { border: false, header: [] },
+	colWidths: [15, half, half],
+	chars: { 'top': ' ' , 'top-mid': '' , 'top-left': '' , 'top-right': ''
+	, 'bottom': ' ' , 'bottom-mid': '' , 'bottom-left': '' , 'bottom-right': ''
+	, 'left': '' , 'left-mid': '' , 'mid': ' ' , 'mid-mid': ''
+	, 'right': '' , 'right-mid': '' , 'middle': '' },
+});
+
 
 
 
@@ -90,114 +104,105 @@ const obj = {
 	yo: {
 		epale: {
 			hello: "dsad"
-		}
+		},
+		hola: 65
 	},
 	hi() {}
 }
 
-const diffs = [
-	{
-		path: "0",
-		received: 1,
-		expected: obj
+const obj2 = {
+	yo: {
+		epale: {
+			hi: "wepa"
+		},
+		hola: 65
 	},
-	{
-		path: "last.0",
-		received: obj,
-		expected: JSON.stringify(obj, null, 2).green
-	},
+	hi: 6
+}
 
+let arr = [
+	349, 350, obj, obj2, 353, 354, 355,
+	356, 357, 358, 359, 360, 361, 362
 ]
-// console(diffs, {depth: 50, compact: false, sorted: true, numericSeparator: true})
 
-// console.log("")
-// console.log("Diffs: ".thick)
-// console.log("")
-// console.group()
-// console.log("Path: ".yellow.thick + "name.last.0".yellow)
-// console.group()
-// console.log("Expected: ".red.thick)
-// console.group()
-// console.log("1")
-// console.groupEnd()
-// console.log("Received: ".green.thick)
-// console.group()
-// console.log(JSON.stringify(obj, null, 2))
-// console.log("")
-// console.groupEnd()
-// console.groupEnd()
+const set = new Set(arr)
 
-// console.log("Path: ".yellow.thick + "name.last.0".yellow)
-// console.group()
-// console.log("Expected: ".red.thick)
-// console.group()
-// console.log("1")
-// console.groupEnd()
-// console.log("Received: ".green.thick)
-// console.group()
-// console.log(JSON.stringify(obj, null, 2))
+let setLog = inspect(arr, {compact: true, depth: 1})
+.replaceAll("\n ", "")
+.replaceAll(" },", " },\n")
+.replaceAll("{", "\n {")
 
-console.log("")
-console.log("Diffs: ".thick)
-console.log("")
-console.group()
-console.log("name.last.0".yellow.thick)
-console.group()
-console.log(inspect(new Set([1, 2, 3]), {compact: true, colors: false}).red + "  ≠  ".thick.gray + inspect(obj, {compact: true, colors: false}).green)
-console.log("")
-console.groupEnd()
-console.groupEnd()
+table.push(
+	// [ {content: `"This is a prop"`.yellow.thick, vAlign: 'center', hAlign: "center"}, {content: setLog.red, vAlign: 'center'}, {content: show(obj).green, vAlign: "center"}],
+	[ {content: "0".yellow.thick, vAlign: 'center', hAlign: "center"}, {content: show(obj).red, vAlign: 'center'}, {content: show(obj2).green, vAlign: "center"}],
+	);
 
+	console.group()
+	console.log(table.toString());
 
-console.group()
-console.log("name.last.0".yellow.thick)
-console.group()
-console.log(inspect(obj, {compact: true, colors: false}).red)
-console.log(inspect(new Set([1, 2, 3]), {compact: true, colors: false}).red)
-console.log("")
-console.groupEnd()
-console.groupEnd()
+	// hi:
+	// console.dir(setLog)
 
-
-// const rec = [{hi: 1}, {hi: 2}, {hi: 3}]
-const exp2 = [{hi: 1}, {hi: 3}, {hi: 3}]
-console.dir(exp2, {depth: 50, compact: true, sorted: true, numericSeparator: true})
-
-const rec = [1,
-	{
-		title: "show number of failed/passed tests > ",
-		status: "SOHPI_FAILED",
-		fn: () => {},
-		error: obj
-	},
-	{
-		title: "show number of failed/passed tests > ",
-		status: "SOHPI_FAILED",
-		fn: () => {},
-		error: obj
-	},
-	{
-		title: "show number of failed/passed tests > ",
-		status: "SOHPI_FAILED",
-		fn: () => {},
+	function show(obj) {
+		let objStr = inspect(obj, {compact: false, colors: false, depth: 2, sorted: true})
+		objStr = objStr.slice(4, objStr.length - 2)
+		objStr = objStr.replaceAll("\n  ", "\n")
+		return objStr
 	}
-]
 
-const exp = [
+	/*
+	0:
+	hi: [function]   6
+	yo:
+
 	{
-		title: "show number of failed/passed tests > ",
-		status: "SOHPI_FAILED",
-		fn: () => {},
-		error: obj
-	},
-	{
-		title: "show number of failed/passed tests > ",
-		status: "SOHPI_FAILED",
-		fn: () => {},
-		error: obj
-	},
-	{
-		status: "SOHPI_FAILED",
-		fn: () => {},
-	}
-]
+		epale:		hello: "dsad"
+	}   {hi: "wepa"}
+
+	*/
+
+
+
+
+
+	// const rec = [{hi: 1}, {hi: 2}, {hi: 3}]
+	const exp2 = [{hi: 1}, {hi: 3}, {hi: 3}]
+
+	const rec = [1,
+		{
+			title: "show number of failed/passed tests > ",
+			status: "SOHPI_FAILED",
+			fn: () => {},
+			error: obj
+		},
+		{
+			title: "show number of failed/passed tests > ",
+			status: "SOHPI_FAILED",
+			fn: () => {},
+			error: obj
+		},
+		{
+			title: "show number of failed/passed tests > ",
+			status: "SOHPI_FAILED",
+			fn: () => {},
+		}
+	]
+
+	const exp = [
+		{
+			title: "show number of failed/passed tests > ",
+			status: "SOHPI_FAILED",
+			fn: () => {},
+			error: obj
+		},
+		{
+			title: "show number of failed/passed tests > ",
+			status: "SOHPI_FAILED",
+			fn: () => {},
+			error: obj
+		},
+		{
+			status: "SOHPI_FAILED",
+			fn: () => {},
+		}
+	]
