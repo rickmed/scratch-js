@@ -1,12 +1,20 @@
 import { z, ZodSchema } from "zod"
+import { fromZodError } from "zod-validation-error"
 
 const Schema = z.object({
-    name: z.literal("rick")
+	name: z.literal("rick")
 }).strict()
 
-const res = Schema.safeParse({name: "rick", last: "y"})
+const res = Schema.safeParse({name: "rick", oy: 1})
 
-if (res.error) console.log(res.error.issues);
+// if (res.error) console.dir(res.error.issues);
+if (res.error) console.dir(fromZodError(res.error));
+
+
+// [ 'stack', 'issues', 'addIssue', 'addIssues', 'name' ]
+
+// if (res.error) console.dir(fromZodError(res.error));
+
 /*
 EXAMPLE 1:
 
@@ -80,4 +88,3 @@ ON SUCCESS:
 
 // console.log(tuna.error.issues);
 // console.log(tuna.error.errors);
-
