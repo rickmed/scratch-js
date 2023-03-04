@@ -5,7 +5,6 @@ try {
 }
 catch(e) {
 	// console.log(Object.getOwnPropertyNames(e))
-
 	// [
 	// 	'stack',
 	// 	'message',
@@ -17,7 +16,7 @@ catch(e) {
 	// 	'operator'
 	//  ]
 
-	console.log(e.toString())
+	console.log(e)
 
 	// console.log(e.name)
 }
