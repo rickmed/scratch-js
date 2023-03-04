@@ -4,7 +4,6 @@
     "#mymod": "./import_modules/module1.js"
   },
   "dependencies": {
-    "cli-table3": "^0.6.3",
     "expect": "^29.4.3",
     "zod": "^3.20.6"
   }
