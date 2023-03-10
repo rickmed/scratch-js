@@ -1,17 +1,21 @@
-function pathFromRootDir(relPath, rootPath) {
+function print_Todo() {
+	if (summary.n_TodoTests === 0) return
 
-	const rootDir = rootPath.split(path.sep).pop()
-	const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-	let foundRootDir = false
-	let pathToCurrModule = []
-	for (const dir of __dirname.split(path.sep)) {
-		if (foundRootDir) {
-			pathToCurrModule.push(dir)
-			continue
+	indent()
+	print("🖊️ Todo tests: ".blue)
+	indent()
+	for (const [filePath, { clusters: { todo } }] of suite.suites) {
+		if (todo.size === 0) continue
+		print(`● ${filePath}`.blue)
+		indent()
+		for (const testID of todo) {
+			print(`[] ${fullTestStr(testID).blue}`.blue)
 		}
-		if (dir === rootDir) foundRootDir = true
+		outdent()
 	}
-
-	return path.join(...pathToCurrModule, relPath)
+	outdent()
+	outdent()
+	print_nl()
 }
+
+
