@@ -16,6 +16,14 @@ async function* player(name, table) {
 }
 
 const table = ch();
-go(player, "ping", table);
-go(player, "pong", table);
+go(player, "ping", table)
+go(player, "pong", table)
+// player.go("pong", table)
 yield put(table, { hits: 0 });
+
+
+// example of cancellation with timeout
+// need a way
+
+
+

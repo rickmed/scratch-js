@@ -32,7 +32,7 @@ function take(ch) {
 
 
 function timeout(ms) {
-	return new Promise(res => timeout(() => res()), ms)
+	return new Promise(res => setTimeout(() => res()), ms)
 }
 
 
