@@ -2,24 +2,24 @@ async function* player(name, table) {
 	while (true) {
 		let ball = yield take(table);
 
-		if (ball === CLOSED) {
-			console.log(name + ": table's gone");
-			return;
-		}
-
 		ball.hits += 1;
-		console.log(`${name} ${ball.hits}`);
+		console.log(`${name} hits. Total hits: ${ball.hits}`);
 
-		await timeout(100);
+		// await timeout(100); this does not work bc the scheduler needs to know when to park/resume other actors
+		yield sleep(100)
 		yield put(table, ball);
 	}
 }
 
-const table = ch();
-go(player, "ping", table)
-go(player, "pong", table)
-// player.go("pong", table)
-yield put(table, { hits: 0 });
+fork(function* main() {
+
+	const table = ch(1);
+
+	fork(player, "player 1", table)
+	fork(player, "player 2", table)
+
+	yield put(table, { hits: 0 });
+})
 
 
 
