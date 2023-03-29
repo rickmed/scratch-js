@@ -2,30 +2,141 @@
 	So this is like CSP but channels are not fan-out, ie,
 	1Process:1Channel
 
-	implementation:
-		fork accepts a gen or {rec()}
-
 	fork runs the object and returns {gen}
 		runs:
-			if runs the gen until rec()
-				rec() returns just a constant (message to scheduler)
+			it runs the gen until rec()
+
 				it checks if gen has an out channel (below it doesn't, until pipe())
 					so it parks it
+
 				pipe provides it with an out channel (and calls scheduler to resume the gen)
 
-
-			out(msg) has the same semantics as out(ch, msg)
-
+			-rec():
 
 
+			- out(msg):
+				- checks if queue has capacity,
+					- if it has, it puts the value in queue and continue running then gen until:
+						- done
+						- ch is full
+							which will park the gen (put it in ch.waitingSenders)
+							and put the ch in channelsWithNewMsgs
+
+		Processes can be blocked on send (when out is full) or in (no new msgs)
 
 */
+
+const NONE = Symbol("none")
+const FULL = Symbol("full")
+
+function Buffer(cap = 100) {
+	let _buffer = []
+	return {
+		pull() {
+			if (_buffer.length === 0) {
+				return NONE
+			}
+			--cap
+			return _buffer.pop()
+		},
+		push(x) {
+			if (_buffer.length === cap) {
+				return FULL
+			}
+			++cap
+			_buffer.unshift(x)
+		}
+	}
+}
+
+let currRunningProcess = undefined
+
+const REC = 1
+function rec() {
+	return REC
+}
+
+const OUT = 2
+let outMsg
+function out(msg) {
+	outMsg = msg
+	return OUT
+}
+
+const SLEEP = 3
+let sleep_ms
+function sleep(ms) {
+	sleep_ms = ms
+	return SLEEP
+}
+
+function fork(gen, ...args) {
+	const genObj = gen(...args)
+	genObj._inQ = Buffer()
+	runProcess(genObj)
+}
+
+
+function runProcess(genObj = currRunningProcess) {
+	let process = currRunningProcess
+
+	let yielded = process.next()
+
+	while (!yielded.done) {
+
+		const yieldedVal = yielded.value
+
+		if (yieldedVal === REC) {
+
+			const msgFromBuffer = process._inQ.pull()
+
+			if (msgFromBuffer === NONE) {
+				park(process)
+				return
+			}
+
+			yielded = process.next(msgFromBuffer)
+			continue
+		}
+
+		if (yieldedVal === OUT) {
+
+			if (!process._outQ) {
+				park(process)
+				return
+			}
+
+			const pushResult = process._inQ.push(outMsg)
+
+			if (pushResult === FULL) {
+				park(process)
+				return
+			}
+
+
+		}
+
+		if (yieldedVal === SLEEP) {
+			setTimeout(() => {
+				yielded = process.next()
+				continue
+			}, sleep_ms)
+		}
+
+	}
+}
+
+
+let parkedProcesses = new Set()
+function park(process) {
+	parkedProcesses.add(process)
+}
 
 
 async function* player(name) {
 	while (true) {
 		let msg = yield rec();
-		// let {sender, msg} = yield rec(withSender)
+		// let {sender, msg} = yield recWithSender()
 
 		msg.hits += 1;
 		console.log(`${name} hits. Total hits: ${msg.hits}`);
@@ -42,6 +153,7 @@ const p1 = fork(player, "ping")
 const p2 = fork(player, "pong")
 p1.pipe(p2)
 p2.pipe(p1)
+send(p1, {hits: 0})
 
 // or
 // let p1 = fork(player, "ping")
