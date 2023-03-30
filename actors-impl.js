@@ -1,35 +1,9 @@
-/*
-	So this is like CSP but channels are not fan-out, ie,
-	1Process:1Channel
-
-	fork runs the object and returns {gen}
-		runs:
-			it runs the gen until rec()
-
-				it checks if gen has an out channel (below it doesn't, until pipe())
-					so it parks it
-
-				pipe provides it with an out channel (and calls scheduler to resume the gen)
-
-			-rec():
-
-
-			- out(msg):
-				- checks if queue has capacity,
-					- if it has, it puts the value in queue and continue running then gen until:
-						- done
-						- ch is full
-							which will park the gen (put it in ch.waitingSenders)
-							and put the ch in channelsWithNewMsgs
-
-		Processes can be blocked on send (when out is full) or in (no new msgs)
-
-*/
+let runnableActors = new Set()
 
 const NONE = Symbol("none")
 const FULL = Symbol("full")
 
-function Buffer(cap = 100) {
+function newBuffer(cap = 100) {
 	let _buffer = []
 	return {
 		pull() {
@@ -45,11 +19,23 @@ function Buffer(cap = 100) {
 			}
 			++cap
 			_buffer.unshift(x)
-		}
+		},
+		waitingReceiver: undefined,
+		waitingSenders: new Set(),
 	}
 }
 
-let currRunningProcess = undefined
+function newActor(genObj) {
+	const actor = genObj
+	actor._inBuff = newBuffer()
+	actor.pipe = function pipe(otherActor) {
+		actor._outBuff = otherActor._inBuff
+		currRunningActor = actor
+		runActor()
+	}
+}
+
+let currRunningActor = undefined
 
 const REC = 1
 function rec() {
@@ -57,9 +43,8 @@ function rec() {
 }
 
 const OUT = 2
-let outMsg
 function out(msg) {
-	outMsg = msg
+	currRunningActor._outMsg = msg
 	return OUT
 }
 
@@ -72,15 +57,17 @@ function sleep(ms) {
 
 function fork(gen, ...args) {
 	const genObj = gen(...args)
-	genObj._inQ = Buffer()
-	runProcess(genObj)
+	currRunningActor = newActor(genObj)
+	runActor()
 }
 
 
-function runProcess(genObj = currRunningProcess) {
-	let process = currRunningProcess
+function runActor() {
+	// need to check here what status is the actor in
+	// bc it k
 
-	let yielded = process.next()
+	const actor = currRunningActor
+	let yielded = actor.next()
 
 	while (!yielded.done) {
 
@@ -88,49 +75,50 @@ function runProcess(genObj = currRunningProcess) {
 
 		if (yieldedVal === REC) {
 
-			const msgFromBuffer = process._inQ.pull()
+			const msgFromBuffer = actor._inBuff.pull()
 
 			if (msgFromBuffer === NONE) {
-				park(process)
+				actor._inBuff.waitingReceiver = actor
 				return
 			}
 
-			yielded = process.next(msgFromBuffer)
+			yielded = actor.next(msgFromBuffer)
 			continue
 		}
 
 		if (yieldedVal === OUT) {
 
-			if (!process._outQ) {
-				park(process)
+			if (!actor._outBuff) {
+				// actor stays in actor._outMsg = msg
 				return
 			}
 
-			const pushResult = process._inQ.push(outMsg)
+			const pushResult = actor._inBuff.push(actor._outMsg)
 
 			if (pushResult === FULL) {
-				park(process)
+				// actor stays in actor._outMsg = msg
+				actor._outBuff.waitingSenders.add(actor)
 				return
 			}
 
-
+			yielded = actor.next()
+			continue
 		}
 
 		if (yieldedVal === SLEEP) {
+
 			setTimeout(() => {
-				yielded = process.next()
+				yielded = actor.next()
 				continue
 			}, sleep_ms)
-		}
 
+			return
+		}
 	}
 }
 
 
-let parkedProcesses = new Set()
-function park(process) {
-	parkedProcesses.add(process)
-}
+
 
 
 async function* player(name) {
@@ -141,7 +129,6 @@ async function* player(name) {
 		msg.hits += 1;
 		console.log(`${name} hits. Total hits: ${msg.hits}`);
 
-		// await sleep(500); this does not work bc the scheduler needs to know when to park/resume other actors
 		yield sleep(500)
 		yield out(msg);
 		// or yield out(msg, sender)
