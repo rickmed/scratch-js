@@ -20,19 +20,28 @@ function newBuffer(cap = 100) {
 			++cap
 			_buffer.unshift(x)
 		},
+		get isEmpty() {
+			return _buffer.length === 0
+		},
 		waitingReceiver: undefined,
 		waitingSenders: new Set(),
 	}
 }
 
 function newActor(genObj) {
+
 	const actor = genObj
+
 	actor._inBuff = newBuffer()
+	actor.state = undefined
+
 	actor.pipe = function pipe(otherActor) {
 		actor._outBuff = otherActor._inBuff
 		currRunningActor = actor
-		runActor()
+		resumeActor()
 	}
+
+	return actor
 }
 
 let currRunningActor = undefined
@@ -57,14 +66,40 @@ function sleep(ms) {
 
 function fork(gen, ...args) {
 	const genObj = gen(...args)
-	currRunningActor = newActor(genObj)
+	const actor = newActor(genObj)
+	currRunningActor = actor
 	runActor()
+	return actor
+}
+
+function resumeActor() {
+
+	const actor = currRunningActor
+
+	// actor can be blocked at rec() or at out(msg)
+	// how to know this?
+
+	if (actor._inBuff.isEmpty) {
+		return
+	}
+
+
+
 }
 
 
-function runActor() {
+function runActor(resume = false) {
 	// need to check here what status is the actor in
-	// bc it k
+	// bc it could be in rec state but still no msgs in it's queue
+	// this is different than golang bc processes are not waking up each other
+	// there's a third party (the piper) which wakes them up
+
+	// if pipe is called, it means the actor was already ran (it's blocked)
+		// bc the only way to call pipe is to have an actor (called fork)
+	// if actor is blocked, it is in the same states as if another actor wakes it
+
+	// in yield out(msg)
+	// or yield rec()
 
 	const actor = currRunningActor
 	let yielded = actor.next()
