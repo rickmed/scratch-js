@@ -38,7 +38,6 @@ function newActor(genObj) {
 	actor.pipe = function pipe(otherActor) {
 		actor._outBuff = otherActor._inBuff
 		currRunningActor = actor
-		resumeActor()
 	}
 
 	return actor
@@ -72,32 +71,15 @@ function fork(gen, ...args) {
 	return actor
 }
 
-function resumeActor() {
-
-	const actor = currRunningActor
-
-	// actor can be blocked at rec() or at out(msg)
-	// how to know this?
-
-	if (actor._inBuff.isEmpty) {
-		return
-	}
 
 
+// states
+const BLOCK_SEND = 1
+const BLOCK_REC = 2
 
-}
+function runActor() {
 
-
-function runActor(resume = false) {
-	// need to check here what status is the actor in
-	// bc it could be in rec state but still no msgs in it's queue
-	// this is different than golang bc processes are not waking up each other
-	// there's a third party (the piper) which wakes them up
-
-	// if pipe is called, it means the actor was already ran (it's blocked)
-		// bc the only way to call pipe is to have an actor (called fork)
-	// if actor is blocked, it is in the same states as if another actor wakes it
-
+	
 	// in yield out(msg)
 	// or yield rec()
 
@@ -114,6 +96,7 @@ function runActor(resume = false) {
 
 			if (msgFromBuffer === NONE) {
 				actor._inBuff.waitingReceiver = actor
+				actor.state = BLOCK_REC
 				return
 			}
 
@@ -124,15 +107,17 @@ function runActor(resume = false) {
 		if (yieldedVal === OUT) {
 
 			if (!actor._outBuff) {
-				// actor stays in actor._outMsg = msg
+				actor.state = BLOCK_SEND
+				// with in actor._outMsg = msg
 				return
 			}
 
 			const pushResult = actor._inBuff.push(actor._outMsg)
 
 			if (pushResult === FULL) {
-				// actor stays in actor._outMsg = msg
 				actor._outBuff.waitingSenders.add(actor)
+				actor.state = BLOCK_SEND
+				// with in actor._outMsg = msg
 				return
 			}
 
@@ -143,8 +128,8 @@ function runActor(resume = false) {
 		if (yieldedVal === SLEEP) {
 
 			setTimeout(() => {
-				yielded = actor.next()
-				continue
+				currRunningActor = actor
+				runActor()
 			}, sleep_ms)
 
 			return
@@ -159,7 +144,7 @@ function runActor(resume = false) {
 async function* player(name) {
 	while (true) {
 		let msg = yield rec();
-		// let {sender, msg} = yield recWithSender()
+		// let {sender, msg} = yield take()
 
 		msg.hits += 1;
 		console.log(`${name} hits. Total hits: ${msg.hits}`);
@@ -185,21 +170,6 @@ send(p1, {hits: 0})
 yield put(table, { hits: 0 });
 
 
-const ping = spawnStateless(system, async (msg, ctx) =>  {
-	console.log(msg.value);
-
-	await delay(500);
-	dispatch(msg.sender, { value: ctx.name, sender: ctx.self });
- }, 'ping');
-
- const pong = spawnStateless(system, (msg, ctx) =>  {
-	console.log(msg.value);
-	dispatch(msg.sender, { value: ctx.name, sender: ctx.self });
- }, 'pong');
-
- dispatch(ping, { value: 'begin' sender:pong });
-
-
 
 
 /**** self() api options ***
@@ -212,37 +182,4 @@ spawn(function* coor({pid}) {
 })
 
 
-*/
-
-
-
-
-/**** ways to "connect" actors ***
-
-1) Elixir style
-	- not great bc locateFiles should be first in OOO-pipeline
-	but need loadFiles pid so that locateFiles knows where to send data
-
-spawn(function* coord({me}) {
-
-	const pid = yield spawn(loadFiles, me)
-	yield spawn(locateFiles, pid)
-
-})
-
-
-// 3) implementation???
-ie, where should locate send stuff?
-
-spawn(function* coord({me}) {
-
-	const locate = yield spawn(locateFilePaths)
-	const load = yield spawn(loadFiles, me)
-	locate.pipe(load)
-
-	// or (if you don't need to reference load elsewhere)
-
-	yield spawn(locateFilePaths).pipe(loadFiles, ...args)
-
-})
 */
