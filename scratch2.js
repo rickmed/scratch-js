@@ -1,28 +1,3 @@
-async function* player(name, table) {
-	while (true) {
-		let ball = yield take(table);
-
-		ball.hits += 1;
-		console.log(`${name} hits. Total hits: ${ball.hits}`);
-
-		// await timeout(100); this does not work bc the scheduler needs to know when to park/resume other actors
-		yield sleep(100)
-		yield put(table, ball);
-	}
-}
-
-fork(function* main() {
-
-	const table = ch(1);
-
-	fork(player, "player 1", table)
-	fork(player, "player 2", table)
-
-	yield put(table, { hits: 0 });
-})
-
-
-
 /* example of sophi coordinator
 
 A channel needs to be created so that workers pass messages to it (or

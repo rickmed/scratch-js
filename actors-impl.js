@@ -50,10 +50,10 @@ function rec() {
 	return REC
 }
 
-const OUT = 2
+const SEND = 2
 function out(msg) {
 	currRunningActor._outMsg = msg
-	return OUT
+	return SEND
 }
 
 const SLEEP = 3
@@ -73,17 +73,29 @@ function fork(gen, ...args) {
 
 
 
-// states
-const BLOCK_SEND = 1
-const BLOCK_REC = 2
+/*
+	actor._state
+	actor._inBuff.waitingSenders
+	actor._inBuff.waitingReceiver
+	actor._outBuff
+	actor._outMsg
+*/
+const BLOCKED_SEND = 1  // actor._outMsg = msg
+const BLOCKED_REC = 2
 
 function runActor() {
 
-	
+	const actor = currRunningActor
+
+	if (actor._state === BLOCKED_REC) {
+
+	}
+	/*
+	what state is it in?
+	*/
 	// in yield out(msg)
 	// or yield rec()
 
-	const actor = currRunningActor
 	let yielded = actor.next()
 
 	while (!yielded.done) {
@@ -96,7 +108,7 @@ function runActor() {
 
 			if (msgFromBuffer === NONE) {
 				actor._inBuff.waitingReceiver = actor
-				actor.state = BLOCK_REC
+				actor._state = BLOCKED_REC
 				return
 			}
 
@@ -104,11 +116,10 @@ function runActor() {
 			continue
 		}
 
-		if (yieldedVal === OUT) {
+		if (yieldedVal === SEND) {
 
 			if (!actor._outBuff) {
-				actor.state = BLOCK_SEND
-				// with in actor._outMsg = msg
+				actor._state = BLOCKED_SEND
 				return
 			}
 
@@ -116,8 +127,7 @@ function runActor() {
 
 			if (pushResult === FULL) {
 				actor._outBuff.waitingSenders.add(actor)
-				actor.state = BLOCK_SEND
-				// with in actor._outMsg = msg
+				actor._state = BLOCKED_SEND
 				return
 			}
 
@@ -128,8 +138,7 @@ function runActor() {
 		if (yieldedVal === SLEEP) {
 
 			setTimeout(() => {
-				currRunningActor = actor
-				runActor()
+				resumeFromSleep(actor)
 			}, sleep_ms)
 
 			return
@@ -137,7 +146,14 @@ function runActor() {
 	}
 }
 
+function resumeFromSleep(actor) {
+	
+}
 
+
+function send(actor, msg) {
+
+}
 
 
 
