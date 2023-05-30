@@ -1,6 +1,14 @@
 import { parentPort } from "worker_threads";
 
+let msgs = []
+
 parentPort.on('message', msg => {
-    parentPort.postMessage(msg);
-	console.log("worker", process.stdout.isTTY)
+
+	msgs.push(performance.now() - msg)
+
+	if (msgs.length === 40) {
+		console.log("msgs from parent", msgs)
+	}
+
+    parentPort.postMessage(performance.now());
 })

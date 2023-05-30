@@ -1,3 +1,14 @@
+/*
+So node workers need to be spawn only once (ie, one js file per worker)
+what workers need to do:
+	- Pull
+
+
+
+*/
+
+
+
 let runnableActors = new Set()
 
 const NONE = Symbol("none")
@@ -147,7 +158,7 @@ function runActor() {
 }
 
 function resumeFromSleep(actor) {
-	
+
 }
 
 
