@@ -1,11 +1,12 @@
 import { fork } from "ribu"
 
 // me === self()
-fork(function* coord({me}) {
+fork(function* main({me}) {
 
-	// yield lets ribu knows this is are children of coord (for actor monitoring)
+	// yield lets ribu knows this is are children of main (for actor monitoring)
 	// both are launched in parallel
-	const [locateID, loadFilesID] = yield forkPipe(locateFilesPath(me), loadFiles())
+	const [$locate, $loadFiles] = yield forkPipe(locateFilesPath(me), loadFiles())
+	// return handles so can do $locate.cancel()
 
 	// loadFiles is made of workers
 	// a worker can signal
@@ -18,7 +19,7 @@ fork(function* coord({me}) {
 
 
 
-const locateFilesPath = ($coord, sophiConfig) => function* () {
+const locateFilesPath = ($main, sophiConfig) => function* () {
 	for (const folder of sophiConfig.folders) {  // list of folders where tests are
 		lookRecursive(folder)
 	}
