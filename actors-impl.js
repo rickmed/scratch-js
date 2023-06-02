@@ -1,31 +1,32 @@
 class _ArrayQueue {
+	#capacity
+	#array
 
-	constructor(capacity) {
-		this.capacity = capacity
-		this._array = []
-		this.EMPTY = 1
+	constructor(capacity = Number.MAX_SAFE_INTEGER) {
+		this.#capacity = capacity
+		this.#array = []
 	}
 
+	get isEmpty() {
+		return this.#array.length === 0
+	}
 	pull() {
-		if (_array.length === 0) {
-			return this.EMPTY
-		}
 		return this.buffer.pop()
 	}
-	push(x) {
-		return this._array.unshift(x)
-	}
 	get overCapacity() {
-		return this._array.length > this.capacity
+		return this.#array.length > this.#capacity
+	}
+	push(x) {
+		return this.#array.unshift(x)
 	}
 }
 
 let currentCh
-class _Channel {
+class Channel {
 
-	static SEND = 1
-	static REC = 1
-	static OVER_CAP = 3
+	static OP_SEND = 1
+	static OP_REC = 1
+	static OVER_CAPACITY = 3
 	#queue
 
 	constructor(capacity) {
@@ -33,24 +34,24 @@ class _Channel {
 		this.currentSendingMsg = undefined
 
 		// both are Queue<Process>
-		this.waitingReceivers = new _ArrayQueue(Number.MAX_SAFE_INTEGER)
-		this.waitingSenders = new _ArrayQueue(Number.MAX_SAFE_INTEGER)
+		this.waitingReceivers = new _ArrayQueue()
+		this.waitingSenders = new _ArrayQueue()
 	}
 
 	send(msg) {
 		this.currentSendingMsg = msg
 		currentCh = this
-		return _Channel.SEND
+		return Channel.OP_SEND
 	}
 	rec() {
 		currentOp.ch = ch_
-		return _Channel.REC
+		return Channel.OP_REC
 	}
 	_push() {
-		const _queue = this.#queue
-		_queue.push(this.currentSendingMsg)
-		if (_queue.overCapacity) {
-			return _Channel.OVER_CAP
+		const queue = this.#queue
+		queue.push(this.currentSendingMsg)
+		if (queue.overCapacity) {
+			return Channel.OVER_CAPACITY
 		}
 	}
 	_pull() {
@@ -60,15 +61,20 @@ class _Channel {
 
 
 function Ch(capacity = 1) {
-	return new _Channel(capacity)
+	return new Channel(capacity)
 }
 
-class _Process {
+class Process {
+
+	#genObj
+
 	constructor(genObj) {
-		this._genObj = genObj
+		this.#genObj = genObj
+		this.runnableProcesses = new _ArrayQueue()
 	}
+
 	start() {
-		const {done, value} = this._genObj.next()
+		const {done, value} = this.#genObj.next()
 		this.#handleYield(value)
 	}
 	resume() {
@@ -85,18 +91,19 @@ class _Process {
 			// a sleep
 			// a promise
 
-		if (value === _Channel.SEND) {
+		if (value === Channel.OP_SEND) {
 
 			const res = currentCh._push()
 
-			if (res === _Channel.OVER_CAP) {
+			if (res === Channel.OVER_CAPACITY) {
 				waitingSenders.push(this)
 				return
 			}
 
 			this.resume()
 		}
-		if (value === _Channel.REC) {
+
+		if (value === Channel.OP_REC) {
 
 			const {ch: {queue}} = currentOp
 			const msg = queue.pull()
@@ -129,7 +136,7 @@ function go(gen_or_genFn) {
 		throw new Error("You must pass in a generator function or generator object")
 	}
 
-	new _Process(genObj).start()
+	new Process(genObj).start()
 }
 
 
