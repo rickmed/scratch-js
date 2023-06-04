@@ -1,5 +1,5 @@
 function* hey() {
-	// const firstIn = yield 5
+	const firstIn = yield 5
 	// console.log("from gen:", firstIn)
 	// console.log("fron gen: ", yield 10)
 	// return "yes"
@@ -25,7 +25,7 @@ console.log(cinco)  // { value: 5, done: false }
 
 */
 
-// console.log(genObj.next(2))
+console.log(genObj.next(2))
 	// prints "from gen: 2"
 	// { value: 10, done: false }
 
