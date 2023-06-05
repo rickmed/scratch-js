@@ -19,14 +19,13 @@ class _ArrayQueue {
 	}
 }
 
-// this is an optimization instead of ch.send()|rec() returning objects with the necessary info
-let currentCh
 
 class Channel {
 
-	static SEND_OVER_CAPACITY = 1
-	static SEND_OK = 2
-	static OP_REC = 1
+	static currentOp = undefined
+	static SEND_OK = 1
+	static SEND_OVER_CAPACITY = 2
+	static OP_REC = 3
 	#queue
 
 	constructor(capacity) {
@@ -41,17 +40,15 @@ class Channel {
 		const queue = this.#queue
 		if (queue.isFull) {
 			queue.push(this.currentSendingMsg)
-			return Channel.SEND_OVER_CAPACITY
+			Channel.currentOp = Channel.SEND_OVER_CAPACITY
+			return
 		}
 		queue.push(this.currentSendingMsg)
-		return Channel.SEND_OK
+		Channel.currentOp = Channel.SEND_OK
 	}
 	rec() {
 		currentCh = this
 		return Channel.OP_REC
-	}
-	_push() {
-
 	}
 	_pull() {
 
@@ -85,7 +82,7 @@ class Process {
 		this.receivingMsg = undefined
 	}
 
-	run() {
+	run(val) {
 
 		const receivingMsg = this.receivingMsg  // set by proc sending on a channel, promise, cb...
 
@@ -106,16 +103,17 @@ class Process {
 				// a promise
 
 			// when send I need: {procSending (this), ch, msg}
-			// CONTINUE HERE: ch.send() returns "OK" or "OVER CAP"
-			if (value === Channel.SEND_OVER_CAPACITY) {
+			if (Channel.currentOp === Channel.SEND_OK) {
+				Channel.currentOp = undefined
+				continue
+			}
 
+			if (Channel.currentOp === Channel.SEND_OVER_CAPACITY) {
+``
 				waitingSenders.push(this)
-				this.#parkProcess()
-				if (currentCh._push() === Channel.SEND_OVER_CAPACITY) {
-					return
-				}
 
-				this.#resume()
+				Channel.currentOp = undefined
+				return
 			}
 
 			if (value === Channel.OP_REC) {
