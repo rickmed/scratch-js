@@ -8,6 +8,9 @@ class _ArrayQueue {
 		this.#array = []
 	}
 
+	get isEmpty() {
+		return this.#array.length === 0
+	}
 	get isFull() {
 		return this.#array.length === this.#capacity
 	}
@@ -25,33 +28,33 @@ class Channel {
 	static currentOp = undefined
 	static SEND_OK = 1
 	static SEND_OVER_CAPACITY = 2
-	static OP_REC = 3
-	#queue
+	static REC = 3
 
 	constructor(capacity) {
-		this.#queue = new _ArrayQueue(capacity)
-		this.currentSendingMsg = undefined
-
-		this.waitingReceivers = new _ArrayQueue()//<Process>
-		this.waitingSenders = new _ArrayQueue()//<Process>
+		this._buffer = new _ArrayQueue(capacity)
+		this._waitingReceivers = new _ArrayQueue()//<Process>
+		this._waitingSenders = new _ArrayQueue()//<Process>
 	}
 
 	send(msg) {
-		const queue = this.#queue
-		if (queue.isFull) {
-			queue.push(this.currentSendingMsg)
+		const {_buffer, _waitingReceivers} = this
+
+		if (!_waitingReceivers.isEmpty) {
+			_waitingReceivers.pull().schedule()
+		}
+
+		if (_buffer.isFull) {
+			_buffer.push(msg)
+			this._waitingSenders.push(Process.currentProc)
 			Channel.currentOp = Channel.SEND_OVER_CAPACITY
 			return
 		}
-		queue.push(this.currentSendingMsg)
+
+		_buffer.push(msg)
 		Channel.currentOp = Channel.SEND_OK
 	}
 	rec() {
-		currentCh = this
-		return Channel.OP_REC
-	}
-	_pull() {
-
+		Channel.currentOp = Channel.REC
 	}
 }
 
@@ -76,6 +79,8 @@ class Scheduler {
 
 class Process {
 
+	static currentProc = undefined
+
 	constructor(genObj, scheduler) {
 		this.genObj = genObj
 		this.scheduler = scheduler
@@ -84,39 +89,27 @@ class Process {
 
 	run(val) {
 
-		const receivingMsg = this.receivingMsg  // set by proc sending on a channel, promise, cb...
+		Process.currentProc = this
 
-		// not really necessary but just in case someone does something unsound like
-			// const x = sleep(10)
-			// const x = ch.send(y)
-			// they would be receiving a value from a previous operation
-		this.receivingMsg = undefined
-
-
-		let {done, value} = this.genObj.next(receivingMsg)   // first gen.next() is ignored so is ok if passing undefined
+		let {done, value} = this.genObj.next(val)
 		while (!done) {
 
-			// value can be:
-				// a command to ch send
-				// a command to ch rec
-				// a sleep
-				// a promise
-
-			// when send I need: {procSending (this), ch, msg}
 			if (Channel.currentOp === Channel.SEND_OK) {
 				Channel.currentOp = undefined
 				continue
 			}
 
 			if (Channel.currentOp === Channel.SEND_OVER_CAPACITY) {
-``
-				waitingSenders.push(this)
-
 				Channel.currentOp = undefined
 				return
 			}
 
-			if (value === Channel.OP_REC) {
+			if (Channel.currentOp === Channel.REC) {
+				/* 2 cases:
+					- when proc is being ran:
+						- Need to look into some channel.
+					- when proc is ran from being scheduled
+				 */
 
 				const {ch: {queue}} = currentOp
 				const msg = queue.pull()
@@ -144,6 +137,8 @@ class Process {
 		}
 
 		// ??? throw if a yielded value is something weird like a number
+
+		// when proc is "parked" (while continue) or done, need to run scheduled procs
 
 	}
 	schedule() {
@@ -174,6 +169,14 @@ export function go(gen_or_genFn) {
 	scheduler.runScheduledProcs()
 }
 
+function sleep(ms) {
+	setTimeout(() => {
+		// process.schedule() and runScheduledProcs()
+		// or process.run(undefined) but need to know which proc is being ran
+		Process.currentProc.run()
+	}, ms);
+	// this function returns undefined which will be yielded in while loop
+}
 
 
 function* first(ch) {
