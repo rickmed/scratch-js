@@ -1,2 +1,2 @@
-const val = undefined
-console.log(typeof val?.then === "function")
+const val = {hey: 3}
+console.log(val.done)
