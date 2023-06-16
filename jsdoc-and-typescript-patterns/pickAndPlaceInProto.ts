@@ -19,10 +19,7 @@ function copyMethodsProto(obj, methodNames) {
 }
 
 
-/*
-
+// or:
 type OmitFunctions<T, Exclude extends keyof T = never> = {
     [P in keyof T as T[P] extends Function ? P extends Exclude ? P: never : P]: T[P]
 }
-
-*/
