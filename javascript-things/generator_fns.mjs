@@ -1,3 +1,5 @@
+/*** Generator functions general usage of .next() */
+
 // function* hey() {
 // 	const firstIn = yield 5
 // 	// console.log("from gen:", firstIn)
@@ -23,39 +25,40 @@
 
 
 
-// */
+/*** gen.throw() */
 
-// console.log(genObj.next(2))
-// 	// prints "from gen: 2"
-// 	// { value: 10, done: false }
+// function* gen1() {
+// 	try {
+// 		yield 1
+// 	}
+// 	finally {
+// 		// some cleanup probably.
+// 		console.log("in gen:")
+// 		yield "sup"
+// 		return "done"
+// 	}
+// }
 
-// // console.log(genObj.next("third"))
-// 	// prints "from gen: third"
-// 	// returns { value: undefined, done: true }
-// 	// if it would have a return statement it would return
-// 		// { value: 'yes', done: true }
+// const genObj = gen1()
+
+// let yielded;
+// yielded = genObj.next()
+// console.log(yielded)
+// yielded = genObj.throw("yo")
+// console.log(yielded)
+// yielded = genObj.next()
+// console.log(yielded)
 
 
-/* gen.throw() */
 
-function* gen1() {
-	try {
-		yield 1
-	}
-	finally {
-		// some cleanup probably.
-		console.log("in gen:")
-		yield "sup"
-		return "done"
-	}
-}
+/*** changing *this* used inside the gen */
 
-const genObj = gen1()
-
-let yielded;
-yielded = genObj.next()
-console.log(yielded)
-yielded = genObj.throw("yo")
-console.log(yielded)
-yielded = genObj.next()
-console.log(yielded)
+// function* hi() {
+// 	console.log(this.hey)
+// 	console.log(this.hey)
+// }
+// const thisObj = {hey: "76"}
+// const gen = hi.call(thisObj)
+// // all the future next() calls are bound to the obj above
+// gen.next()
+// gen.next()
