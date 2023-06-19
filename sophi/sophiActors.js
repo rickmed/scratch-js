@@ -66,54 +66,125 @@ loadFiles
 */
 
 
-	// needs to have $main as a parameter to
-const locateFilesPath = ($main, sophiConfig) => function* () {
-	for (const folder of sophiConfig.folders) {  // list of folders where tests are
-		lookRecursive(folder)
-	}
 
-	// ideally, here I would want to launch as many actor/goroutines as files (have them send the result to the loadFiles stage):
-		// but can't launch them eagerly bc it would be the same
-		// as sending messages without backpressure
-	// so, I'd need feedback from the next stage to continue (keep launching goroutines). How?
-		// bc
-
-
-
-
-	async function lookRecursive(dirPath) {
-		const files = await fs.readdir(dirPath, { withFileTypes: true })
-		const fileNames = await Promise.all(files.map(async file => {
-			const filePath = path.join(dirPath, file.name)
-			if (file.isDirectory()) {
-				return lookRecursive(filePath)
-			} else {
-				return filePath
-			}
-		}))
-		return fileNames.flat()
-	}
-
-}
-
-const loadFiles = () => async function*() {
-
-}
 
 
 /*
-1) processes have a this.raise()?
+loadFiles should have "+1 inboxes / msgType":
+	the filePathsQueue
+	childRaiseOnlyUsed
+1) processes can do this.raise()
 2) parent pass itself to the child so the child can parent.send(onlyUsed)
 
-so cancel with generators are handled with finally?
-	- let's do with finally and with pattern matching its single inbox
+=> Maybe similar to the general cancel semantics:
+
+so, either way, the process needs to disambiguate from +1 incomming message types:
+	- cancel
+	- error from itself/child
+	- other (eg: filePaths, onlyUsed)
+
  */
 
+// assume this needs to send files directly to another process (blocks)
 function loadFiles(filePaths) {
-	const filePath = yield filePaths.rec
-	spawn(worker(filePath))
+	const $filePaths = filePaths
+	const msg = yield rec()
+	let onlyUsed = false
+
+	// ===>> probably what I need is to launch 3 process each with their own inbox
+	while (true) {
+		if (msg.filePath) {
+			// if (!onlyUsed) {
+			// 	spawn(worker(filePath))
+			// }
+			yield otherQueue.put(msg.val)
+		}
+		if (msg.onlyUsed) {
+
+			// if a process upstream tries to filePaths.put(), it will trigger its cancellation routine
+			$filePaths.cancel()
+			// if I don't call clear(), it means I want to flush the queue to myself.
+			$filePaths.clear()
+
+			yield msg.process.send("continue")
+		}
+	}
 }
 
-function* worker(filePath) {
+function* worker(filePath) {}
 
-}
+
+
+
+// pretend `go` returns a Process handle instead of a channel
+let proc = go(function * () {
+	setState({ word: "Connecting in a moment..." });
+
+	yield csp.timeout(500);
+
+	let ws;
+	try {
+	  ws = new WebSocket("http://wat.com");
+	  setState({ word: "Connecting now..." });
+
+	  yield makeOnConnectChannel(ws);
+
+	  setState({ word: "Connected!" });
+
+	  let chan = makeMessageChannel(ws);
+	  while (true) {
+		 let value = yield chan;
+		 setState({ word: `Got message: ${value}` });
+	  }
+	} finally {
+	  ws.close();
+	  setState({ word: "Disconnected!" });
+	  // ...and any other cleanup
+	  // this block would be invoked upon termination
+	  // (a lesser known fact about generators is that calling .throw/.return
+	  // on them will still run finally blocks and even let you yield additional values before closing)
+	}
+ });
+
+ // later, after user presses a button, or leaves a route
+ proc.kill();
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // (??) needs to have $main as a parameter to
+// const locateFilesPath = ($main, sophiConfig) => function* () {
+// 	for (const folder of sophiConfig.folders) {  // list of folders where tests are
+// 		lookRecursive(folder)
+// 	}
+
+// 	// ideally, here I would want to launch as many actor/goroutines as files (have them send the result to the loadFiles stage):
+// 		// but can't launch them eagerly bc it would be the same
+// 		// as sending messages without backpressure
+// 	// so, I'd need feedback from the next stage to continue (keep launching goroutines). How?
+// 		// bc
+
+
+// 	async function lookRecursive(dirPath) {
+// 		const files = await fs.readdir(dirPath, { withFileTypes: true })
+// 		const fileNames = await Promise.all(files.map(async file => {
+// 			const filePath = path.join(dirPath, file.name)
+// 			if (file.isDirectory()) {
+// 				return lookRecursive(filePath)
+// 			} else {
+// 				return filePath
+// 			}
+// 		}))
+// 		return fileNames.flat()
+// 	}
+
+// }
