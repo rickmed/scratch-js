@@ -2,6 +2,41 @@ import { Worker } from "node:worker_threads"
 
 const worker = new Worker('./nodejs/worker-threads/worker1.js')
 
+
+// odd messages are worker -> parent time.
+let msgs = []
+
+let sent = performance.now()
+
+worker.on("message", msgObj => {
+
+	let sentThen = sent
+	sent = performance.now()
+	msgs.push(sent - sentThen)
+	msgObj.sent = sent
+	worker.postMessage(msgObj)
+
+	if (msgs.length === 40) {
+		worker.terminate()
+	}
+})
+
+
+worker.on("exit", () => {
+	msgs.shift()
+	let sum = 0
+	for (const msg of msgs) {
+		sum += msg
+	}
+	console.log("avg msg sendg time: ")
+	console.log((sum / (msgs.length))/ 2)
+	// interval.unref()
+})
+
+msgObj.sent = sent
+worker.postMessage(msgObj)
+
+
 const msgObj = {
 	name: 'John Doe',
 	email: 'johndoe@example.com',
@@ -88,41 +123,3 @@ const msgObj = {
 	  },
 	],
  };
-
-
-// odd messages are worker -> parent time.
-let msgs = []
-
-let sent = performance.now()
-
-worker.on("message", msgObj => {
-
-	let sentThen = sent
-	sent = performance.now()
-	msgs.push(sent - sentThen)
-	msgObj.sent = sent
-	worker.postMessage(msgObj)
-
-	if (msgs.length === 40) {
-		worker.terminate()
-	}
-})
-
-
-// const interval = setInterval(() => {
-// 	console.log(worker.performance.eventLoopUtilization());
-//  }, 0)
-
-worker.on("exit", () => {
-	msgs.shift()
-	let sum = 0
-	for (const msg of msgs) {
-		sum += msg
-	}
-	console.log("avg msg sendg time: ")
-	console.log((sum / (msgs.length))/ 2)
-	// interval.unref()
-})
-
-msgObj.sent = sent
-worker.postMessage(msgObj)
