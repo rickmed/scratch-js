@@ -1,4 +1,4 @@
-/*** Generator functions general usage of .next() */
+/*** Generator functions general usage of .next() *************************** */
 
 // function* hey() {
 // 	const firstIn = yield 5
@@ -25,7 +25,9 @@
 
 
 
-/*** gen.throw() */
+/*** gen.throw() ************************************************************ */
+
+/***  */
 
 // function* gen1() {
 // 	try {
@@ -51,7 +53,7 @@
 
 
 
-/*** changing *this* used inside the gen */
+/*** setting "this" used inside the gen ************************************ */
 
 // function* hi() {
 // 	console.log(this.hey)
@@ -62,3 +64,33 @@
 // // all the future next() calls are bound to the obj above
 // gen.next()
 // gen.next()
+
+
+
+/*** gen.return() and try/finally ******************************************* */
+
+function* genfn() {
+	yield 1;
+	try {
+	  yield 2;
+	  yield 3;
+	} finally {
+	  yield 4
+	  yield 5
+	}
+ }
+
+const gen = genfn()
+gen.next()
+
+let yielded
+
+yielded = gen.next()  // 2, done: false
+yielded = gen.return() // transitions to finally...  4, done: false
+yielded = gen.return()  // undefined, done: true
+console.log(yielded)
+
+// yielded = gen.next()  // 2, done: false
+// yielded = gen.return() // 4, done: false
+// yielded = gen.next()  // 5, done:false
+// console.log(yielded)

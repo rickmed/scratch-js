@@ -1,76 +1,74 @@
-import { fork as go, Ch } from "ribu"
-import {worker} from "./sophiWorker.mjs"
+import { go, Ch, workerGo } from "ribu"
+
+function main() {
+
+}
 
 go(function* main() {
-	const [$locateFiles, filePath_Ch] = yield go(locateFilesPath(sophiConfig))
+
+	const [$locateFiles, filePath_Ch] = locateFilesPath(sophiConfig)
 
 	const testFileResults_Ch = Ch(100)
 
 	/* workers must be cancelled if main is cancelled */
 	let workers = Array(cpus().length)  // collect workers so I can wait for them when done
 	for (const workerId of [1,2,3,4]) {
-		/*  ==>>> continue here. how to share channels between nodejs threads? */
-		const worker = yield go(worker($locateFiles, filePath_Ch, testFileResults_Ch))
+		const worker = yield workerGo("./sophiWorker.mjs", "worker", $locateFiles, filePath_Ch, testFileResults_Ch)
 		workers.push(worker)
 	}
 
 	yield go(reporter(testFileResults_Ch))
 
-	yield done($locateFiles, ...workers)  /* ribu:does done return something?? */
-	/*
-		or
-		yield done($loadFiles, $loadFiles)
-
-		alternatively, can use the return value
-		const [res1, res2] = yield $loadFiles.done($loadFiles)
-
-		when parent proc finishes, cancel all unfinished children
-	*/
+	yield done($locateFiles, ...workers)  // ?? does done return something?
+	// ?? or: yield $loadFiles.done(...workers)
 
 })
 
+// need to handle cancellation here
+	// (from $worker), but really from anywhere
+function locateFilesPath(sophiConfig) {
 
+	const filesPath_ch = Ch(100)
 
+	const $locateFiles = yield go(function* () {
+		const {include: {folders, subStrings, extensions}} = sophiConfig
 
+		for (const dir of sophiConfig.folders) {  // list of folders where tests are
+			yield go(readDir(dir))
+		}
 
-
-
-
-
-function* locateFilesPath(sophiConfig) {
-	const {include: {folders, subStrings, extensions}} = sophiConfig
-	const filesPath_ch = Ch(20)
-
-	for (const dir of sophiConfig.folders) {  // list of folders where tests are
-		yield go(lookIn(dir))
-	}
-
-	function* lookIn(dirPath) {
-		const dirents = yield fs.readdir(dirPath, { withFileTypes: true })
-		for (const dirent of dirents) {
-			if (dirent.isFile() && hasCorrectNamesAndExtensions(dirent)) {
-				yield filesPath_ch.put(dirent.path)
-			}
-			if (dirent.isDirectory()) {
-				yield go(lookIn(dirent.path))
+		function* readDir(dirPath) {
+			const entries = yield fs.readdir(dirPath, { withFileTypes: true })
+			for (const entry of entries) {
+				if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
+					yield filesPath_ch.put(entry.path)
+				}
+				if (entry.isDirectory()) {
+					yield go(readDir(entry.path))
+				}
 			}
 		}
-	}
 
-	function hasCorrectNamesAndExtensions(file) {
-		const fileExt = extname(file).slice(1)
-		if (!extensions.includes(fileExt)) {
+		function hasCorrectNamesAndExtensions(file) {
+			const fileExt = extname(file).slice(1)
+			if (!extensions.includes(fileExt)) {
+				return false
+			}
+			for (const str of subStrings) {
+				if (file.includes(str)) {
+					return true
+				}
+			}
 			return false
 		}
-		for (const str of subStrings) {
-			if (file.includes(str)) {
-				return true
-			}
-		}
-		return false
-	}
+	})
 
-	return [this, filesPath_ch]
+	yield go(function* cancel() {
+		this.cancel = true  // ?? or $locateFiles.return()
+		// need to respond that I'm done cancelling
+	})
+
+	return [$locateFiles, filesPath_ch]
 }
 
 
@@ -93,7 +91,9 @@ function* locateFilesPath(sophiConfig) {
 
 
 
-// /* === Other higher level APIs */
+
+
+// /* === ribu higher level APIs */
 // go(function* main() {
 
 // 	// both are launched in parallel
@@ -104,7 +104,7 @@ function* locateFilesPath(sophiConfig) {
 // 	// this:
 // 		// is the
 
-// 	/* Why use *this* api? "this.rec()"
+// 	/* Use *this* api? "this.rec()"
 // 		so I don't pass "me" as an argument
 // 		*this* could contain an internal state as well
 // 			yield rec("done", "") could be used as well

@@ -1,8 +1,43 @@
 import {go, Ch} from "ribu"
 
-export function* worker($locateFiles, files_Ch, testFileResult_Ch) {
+/*
+	so I need somehow to send/receive messages related to parameters of the worker fn.
+		and route them to the appropiate object
+
+	2 options:
+
+		1) Modify ribu.core so that it supports threads (go(), Ch())
+			- con: can't be used in browser (unless supports browser web worker api as well)
+			- con: bit slower.
+				- now would need to have map in which thread the process is and route appropiately
+					- this COULD be nice
+					- idem channels
+			- con/pro: implicit
+
+		2) Have special worker_Go()/worker_Ch()
+			- pro: original go()/Ch() stay fast.
+			- con/pro: explicit
+
+
+		* goWorker() needs to exist either way (+pro: explicit)
+			- bc worker needs to be in a separate file.
+
+
+		* workerCh():
+			- All Chans used/used-From worker need to be explicit
+			- And all Procs (return by go()) used/used-From worker would need to be explicit as well.
+		* Ch(): ??
+
+
+		I'm leaning towards support workers internally, otherwise is
+			too ugly for user.
+*/
+
+
+
+export function* worker($locateFiles, filePaths_Ch, testFileResult_Ch) {
 	const onlyUsed_Ch = Ch()
-	let onlyUsed = false
+	let cancel = false
 	let loadFileProcs = []
 	const testFileResult_Ch = Ch(100)
 
@@ -18,7 +53,7 @@ export function* worker($locateFiles, files_Ch, testFileResult_Ch) {
 			// eg: if a process needs to cancel an async resource
 		loadFileProcs.forEach(proc => proc.cancel())
 
-		onlyUsed = true  // don't launch anymore workers
+		cancel = true  // don't launch anymore workers
 		$locateFiles.cancel()  // cancel upstream
 
 		yield resumeWorker.put()  // resume only one worker
@@ -26,19 +61,25 @@ export function* worker($locateFiles, files_Ch, testFileResult_Ch) {
 
 	yield go(function* handleFilePath() {
 		while (true) {
-			const filePath = yield $locateFiles.filePaths_Ch.rec
-			if (!onlyUsed) {
-				loadFileProcs.push(yield go(processTestFile(filePath, onlyUsed_Ch)))
+			const filePath = yield filePaths_Ch.rec
+			if (cancel) {
+				continue  // this will flush $locateFiles -> void
+				// here I need to let know my parent that I'm done
 			}
-			// if $locateFiles.cancel(), this process will flush the filePaths_Ch -> void
-			// and get parked forever at filePaths_Ch.recv, ie, cancellation works all around
+			loadFileProcs.push(yield go(processTestFile(filePath, onlyUsed_Ch)))
+			// if $locateFiles.cancel(), it will not put anymore data into the chan but
+				// this process continue sending the outstanding data to $processTestFile
+				// options:
+					// 1) if (cancel) continue
+					// 2) const $handleFilePath = yield go(...)
+							// $handleFilePath.return()
 		}
 	})
 
-	// error?
 	// CANCELLATION??
 
-	return this
+
+	// error?
 }
 
 
