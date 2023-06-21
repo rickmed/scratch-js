@@ -1,20 +1,21 @@
 import { fork as go, Ch } from "ribu"
 
 go(function* main() {
-	const [$locateFiles, filePath_Ch] = yield go(locateFilesPath)
+	const [$locateFiles, filePath_Ch] = yield go(locateFilesPath(sophiConfig))
 
-	const testFileResult_Ch = Ch(100)
+	const testFileResults_Ch = Ch(100)
 
 	/* workers must be cancelled if main is cancelled */
-	let workers = Array(cpus().length)  // so I can wait for them to be done
+	let workers = Array(cpus().length)  // collect workers so I can wait for them when done
 	for (const workerId of [1,2,3,4]) {
-		const worker = yield go(worker($locateFiles, filePath_Ch))
+		/*  ==>>> continue here. how to share channels between nodejs threads?du */
+		const worker = yield go(worker($locateFiles, filePath_Ch, testFileResults_Ch))
 		workers.push(worker)
 	}
 
+	yield go(reporter(testFileResults_Ch))
 
-
-	yield done($locateFiles, ...workers)
+	yield done($locateFiles, ...workers)  /* ribu:does done return something?? */
 	/*
 		or
 		yield done($loadFiles, $loadFiles)
@@ -86,31 +87,27 @@ function* processTestFile(filePath, onlyUsed_Ch) {
 
 
 function* locateFilesPath(sophiConfig) {
-	const {testFiles: {folders, subStrings, extensions}} = sophiConfig
+	const {include: {folders, subStrings, extensions}} = sophiConfig
 	const filesPath_ch = Ch(20)
 
 	for (const dir of sophiConfig.folders) {  // list of folders where tests are
 		yield go(lookIn(dir))
 	}
 
-	// can't launch all processes eagerly. Need feedack from chan (downstream)
-	// maybe launch a process per file?
-
 	function* lookIn(dirPath) {
-		const files = yield fs.readdir(dirPath, { withFileTypes: true })
-		for (const file of files) {
-			const filePath = path.join(dirPath, file.name)
-			if (file.isFile() && hasCorrectNamesAndExtensions(file)) {
-				yield filesPath_ch.put(filePath)
+		const dirents = yield fs.readdir(dirPath, { withFileTypes: true })
+		for (const dirent of dirents) {
+			if (dirent.isFile() && hasCorrectNamesAndExtensions(dirent)) {
+				yield filesPath_ch.put(dirent.path)
 			}
-			if (file.isDirectory()) {
-				yield go(lookIn(filePath))
+			if (dirent.isDirectory()) {
+				yield go(lookIn(dirent.path))
 			}
 		}
 	}
 
 	function hasCorrectNamesAndExtensions(file) {
-		const fileExt = path.extname(file).slice(1)
+		const fileExt = extname(file).slice(1)
 		if (!extensions.includes(fileExt)) {
 			return false
 		}
