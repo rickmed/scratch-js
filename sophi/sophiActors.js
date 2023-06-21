@@ -7,16 +7,14 @@ go(function* main() {
 	// this will wait for both to be done
 	yield $loadFiles.done($loadFiles)
 
-	// or
-	// yield done($loadFiles, $loadFiles)
+	/*
+		or
+		yield done($loadFiles, $loadFiles)
 
-	// alternatively, can use the return value
-	// const [res1, res2] = yield $loadFiles.done($loadFiles)
+		alternatively, can use the return value
+		const [res1, res2] = yield $loadFiles.done($loadFiles)
 
-	/* ===>> Doneness
-		if I don't wait here, main genFn will return but child processes will continue to run in the background.
-			so, alternatives (which hold structured concurrency principles):
-				1) when parent proc finishes, cancel all the children
+		when parent proc finishes, cancel all unfinished children
 	*/
 
 })
