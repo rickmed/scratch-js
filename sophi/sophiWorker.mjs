@@ -1,6 +1,7 @@
 import {go, Ch} from "ribu"
 
-/*
+/* Threads support
+
 	so I need somehow to send/receive messages related to parameters of the worker fn.
 		and route them to the appropiate object
 
@@ -33,11 +34,10 @@ import {go, Ch} from "ribu"
 			too ugly for user.
 */
 
-
-
-export function* worker($locateFiles, filePaths_Ch, testFileResult_Ch) {
+// resources that need to cancel here:
+	//
+function* worker($locateFiles, filesPath_ch, testFileResult_Ch) {
 	const onlyUsed_Ch = Ch()
-	let cancel = false
 	let loadFileProcs = []
 	const testFileResult_Ch = Ch(100)
 
@@ -45,46 +45,28 @@ export function* worker($locateFiles, filePaths_Ch, testFileResult_Ch) {
 
 		const [proc, resumeWorker] = yield onlyUsed_Ch.rec
 
-		// if onlyUsed_Ch is fired:
-
-		// cancel the rest of workers
+		/* cancel the rest of workers and upstream to stop sending more data */
 		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-		// proc.cancel() needs to be async/parallel (+ timeouts)
-			// eg: if a process needs to cancel an async resource
-		loadFileProcs.forEach(proc => proc.cancel())
-
-		cancel = true  // don't launch anymore workers
-		$locateFiles.cancel()  // cancel upstream
-
+		yield cancel(loadFileProcs, $locateFiles).rec  // cancels in parallel
+		processFiles = false
+		yield go(flushQueue(filesPath_ch))
+		yield filesPath_ch.put(ribu.DONE)  // don't send before launching flushQueue bc probably get deadlocked
 		yield resumeWorker.put()  // resume only one worker
 	})
 
+
 	yield go(function* handleFilePath() {
 		while (true) {
-			const filePath = yield filePaths_Ch.rec
-			if (cancel) {
-				continue  // this will flush $locateFiles -> void
-				// here I need to let know my parent that I'm done
-			}
+			filePath = yield filesPath_ch.rec
 			loadFileProcs.push(yield go(processTestFile(filePath, onlyUsed_Ch)))
-			// if $locateFiles.cancel(), it will not put anymore data into the chan but
-				// this process continue sending the outstanding data to $processTestFile
-				// options:
-					// 1) if (cancel) continue
-					// 2) const $handleFilePath = yield go(...)
-							// $handleFilePath.return()
 		}
 	})
 
-	// CANCELLATION??
-
-
-	// error?
 }
 
 
 function* processTestFile(filePath, onlyUsed_Ch) {
-	const onlyUsed = yield process(filePath)  // some async work
+	const onlyUsed = yield process(filePath)  // actually process the filePath
 	if (onlyUsed) {
 		const shouldResume = Ch()
 		yield onlyUsed_Ch.put([this, shouldResume])
@@ -92,3 +74,14 @@ function* processTestFile(filePath, onlyUsed_Ch) {
 		// if I continue here it means I wasn't cancelled
 	}
 }
+
+
+function* flushQueue(filePaths_Ch) {
+	while (true) {
+		const filePath = yield filePaths_Ch.rec
+		if (filePath === ribu.DONE) break
+		// do somthing with filePath
+	}
+}
+
+export default worker

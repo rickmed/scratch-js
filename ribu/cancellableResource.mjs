@@ -17,7 +17,7 @@ function ribuFetch(url, opts) {
 		})
 	}
 	catch (err) {
-		// the canceller already knows that the resource is cancelled so it can procece accordingly, not need to throw
+		// the canceller already knows that the resource is cancelled so it can proceed accordingly, no need to throw
 		if (err.name === 'AbortError') {
 			return
 		}

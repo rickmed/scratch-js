@@ -85,9 +85,9 @@ gen.next()
 
 let yielded
 
-yielded = gen.next()  // 2, done: false
-yielded = gen.return() // transitions to finally...  4, done: false
-yielded = gen.return()  // undefined, done: true
+yielded = gen.next()  //  -> 2, done: false
+yielded = gen.return() // ->  4, done: false
+yielded = gen.return()  //  -> undefined, done: trueu
 console.log(yielded)
 
 // yielded = gen.next()  // 2, done: false
