@@ -1,38 +1,44 @@
 import {go, Ch} from "ribu"
 
 
-function* worker($locateFiles, filesPath_ch, testFileResult_Ch) {
+function* worker($locateFiles, testFileResult_Ch) {
 	const onlyUsed_Ch = Ch()
 	let loadFileProcs = []
 	const testFileResult_Ch = Ch(100)
 
-	// If I create a cancelCtx here
+	/*	weirdness: msgs to filesPathCh is done by original actor and worker (below)
+		- is this necessary? let's check
+		problem is that it is a bufferedChan, so there's data on the buffer.
+			so the worker needs to put a message DONE in the chan
+				- but it is ALWAYS best that the chan creator do it (upstream actor)
 
+	*/
 
-	go(function* handleOnlyUsed() {
+	/* IDEA: insead of "go(function* handleFilePath() {...}",
+		this.$locateFiles.rec() {
+			... maybe even make it a class.
+		}
 
-		const [proc, resumeWorker] = yield onlyUsed_Ch.rec
-
-		/* cancel the rest of workers and upstream to stop sending more data */
-		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-
-
-		yield cancel(loadFileProcs, $locateFiles).rec  // cancels in parallel
-		processFiles = false
-		go(flushQueue(filesPath_ch))
-		yield filesPath_ch.put(ribu.DONE)  // don't send before launching flushQueue bc probably get deadlocked
-		yield resumeWorker.put()  // resume only one worker
-	})
-
+	*/
 
 	go(function* handleFilePath() {
 		while (true) {
-			filePath = yield filesPath_ch.rec
+			const filePath = yield $locateFiles.rec
 			const proc = go(processTestFile(filePath, onlyUsed_Ch))
 			loadFileProcs.push(proc)
 		}
 	})
 
+	go(function* handleOnlyUsed() {
+
+		const [proc, resumeWorker] = yield onlyUsed_Ch.rec
+
+		/* cancel the rest of workers (and $upstream: more sending data) */
+		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
+		yield cancel(loadFileProcs, $locateFiles).rec  // cancels in parallel
+		go(flushQueue($locateFiles))  // flush chans is unnecessary 99%
+		yield resumeWorker.put()  // resume only one worker
+	})
 }
 
 
@@ -47,11 +53,11 @@ function* processTestFile(filePath, onlyUsed_Ch) {
 }
 
 
-function* flushQueue(filePaths_Ch) {
+function* flushQueue($locateFiles) {
 	while (true) {
-		const filePath = yield filePaths_Ch.rec
+		const filePath = yield $locateFiles.rec
 		if (filePath === ribu.DONE) break
-		// do somthing with filePath
+		// do something with filePath
 	}
 }
 

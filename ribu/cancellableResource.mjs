@@ -1,9 +1,9 @@
 import { go, Ch } from "ribu"
 
 /*
-	- ribu pulls out the return[1] val and passes [0] to user
+	- ribu passes return[0] to caller and pulls out the return[1] to save internally for cancellation
 	- if you pass an async function for cancellation, ribu will
-		manage the promise but won't await it if cancellation comes first.
+		manage the promise but won't await it deadline comes first.
 	- automatic args passing can be abstracted later.
 */
 function cancellableFetch(url, opts) {
