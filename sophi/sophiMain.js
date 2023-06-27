@@ -31,11 +31,11 @@ function locateFilesPath(sophiConfig) {
 
 	const filesPath_ch = Ch(100)
 
-	const $locateFiles = yield go(function* () {
+	const $locateFiles = go(function* () {
 		const {include: {folders, subStrings, extensions}} = sophiConfig
 
 		for (const dir of sophiConfig.folders) {
-			yield go(readDir(dir))
+			go(readDir(dir))
 		}
 
 		function* readDir(dirPath) {
@@ -45,7 +45,7 @@ function locateFilesPath(sophiConfig) {
 					yield filesPath_ch.put(entry.path)
 				}
 				if (entry.isDirectory()) {
-					yield go(readDir(entry.path))
+					go(readDir(entry.path))
 				}
 			}
 		}

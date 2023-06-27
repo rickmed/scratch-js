@@ -87,7 +87,7 @@ let yielded
 
 yielded = gen.next()  //  -> 2, done: false
 yielded = gen.return() // ->  4, done: false
-yielded = gen.return()  //  -> undefined, done: trueu
+yielded = gen.return()  //  -> undefined, done: true
 console.log(yielded)
 
 // yielded = gen.next()  // 2, done: false
