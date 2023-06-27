@@ -68,8 +68,51 @@ function locateFilesPath(sophiConfig) {
 }
 
 
+/*
+	If I need to _manually_ cancel a process I could run it with go(genFn, {cancel: true})
+		- and comms??:
 
+*/
 
+function* locateFilesPath(sophiConfig) {
+
+	const filesPath_ch = Ch(100)
+
+	const $locateFiles = go(function* () {
+		const {include: {folders, subStrings, extensions}} = sophiConfig
+
+		for (const dir of sophiConfig.folders) {
+			go(readDir(dir))
+		}
+
+		function* readDir(dirPath) {
+			const entries = yield ribu.readdir(dirPath, { withFileTypes: true })
+			for (const entry of entries) {
+				if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
+					yield filesPath_ch.put(entry.path)
+				}
+				if (entry.isDirectory()) {
+					go(readDir(entry.path))
+				}
+			}
+		}
+
+		function hasCorrectNamesAndExtensions(fileName) {
+			const fileExt = extname(fileName).slice(1)
+			if (!extensions.includes(fileExt)) {
+				return false
+			}
+			for (const str of subStrings) {
+				if (fileName.includes(str)) {
+					return true
+				}
+			}
+			return false
+		}
+	})
+
+	return [$locateFiles, filesPath_ch]
+}
 
 
 
