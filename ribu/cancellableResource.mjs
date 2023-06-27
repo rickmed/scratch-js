@@ -1,8 +1,9 @@
 import { go, Ch } from "ribu"
 
+// the pattern below can probably be abstracted
+	// idea: use genFn.this to abstract (ie, put controller on this)
 function ribuFetch(url, opts) {
 
-	const { _cancel: {cancelRequest, cancelDone}} = opts
 	const controller = new AbortController()
 	opts.signal = controller.signal
 
@@ -11,7 +12,7 @@ function ribuFetch(url, opts) {
 	const proc = go(function* () {
 		try {
 			// ribu can interpret promises natively
-			// todo: if ribu can interpret promises natively, just return it to caller?
+			// @todo: if ribu can interpret promises natively, just return it to caller?
 			const res = yield fetch(url, opts)
 			yield response_Ch.put(res)
 		}
@@ -31,9 +32,10 @@ function ribuFetch(url, opts) {
 	})
 
 	go(function* handleCancel() {
-		yield cancelRequest.rec
+		const cancelCh = opts._cancel
+		yield cancelCh.rec
 		yield proc.cancel()
-		yield cancelDone.put()
+		yield cancelCh.put()
 	})
 
 	return response_Ch
@@ -46,7 +48,7 @@ go(function* main() {
 
 	/*  or if i want to cancel manually: */
 	const [cancelProm, _cancel] = CancelCtx()
-	const res = ribuFetch("http://example.com/movies.json", {_cancel})
+	const res = ribuFetch("http://example.com/movies.json", {_cancel}).rec
 	yield cancelProm().rec  // cancelProm returns a channel fulfilled when cancelling is done
 
 	// another process can do $main.cancel() and the fetch will be auto-cancelled
@@ -54,17 +56,14 @@ go(function* main() {
 
 
 function CancelCtx() {
-	const cancelRequest = Ch()
-	const cancelDone = Ch()
+	const cancelCh = Ch()
 
 	function startCancel() {
-
 		go(function* _startCancel() {
-			yield cancelRequest.put()
+			yield cancelCh.put()
 		})
-
 		return cancelDone
 	}
 
-	[startCancel, {cancelRequest, cancelDone}]
+	[startCancel, cancelCh]
 }
