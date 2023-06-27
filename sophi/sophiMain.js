@@ -9,11 +9,11 @@ go(function* main() {
 
 	let workers = Array(cpus().length)  // collect workers so I can wait for them when done
 	for (const workerId of [1,2,3,4]) {
-		const worker = yield workerGo("./sophiWorker.mjs", $locateFiles, filePath_Ch, testFileResults_Ch)
+		const worker = workerGo("./sophiWorker.mjs", $locateFiles, filePath_Ch, testFileResults_Ch)
 		workers.push(worker)
 	}
 
-	yield go(reporter(testFileResults_Ch))
+	go(reporter(testFileResults_Ch))
 
 	yield done($locateFiles, ...workers).rec
 })

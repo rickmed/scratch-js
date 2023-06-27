@@ -1,20 +1,37 @@
 import { go, Ch } from "ribu"
 
-// the pattern below can probably be abstracted
+/*
+	so ribu would need a function to run and a function to cancel?
+	AsyncCancellable must return a ch to user when its done.
+		and accept all the args for the internal resource and an optional cancelCtx
+*/
+
+function myFetch(url, opts) {
+	return AsyncCancellable(function() {
+		const controller = new AbortController()
+		opts.signal = controller.signal
+		fetchProm = fetch(url, opts)
+
+		return () => controller.abort()
+	})
+}
+
+
+// the pattern below can probably be abstracted (for apis: (arg1, opts) => prom)
 	// idea: use genFn.this to abstract (ie, put controller on this)
-function ribuFetch(url, opts) {
+function cancellableFetch(url, opts) {
+	const {_cancelCtx} = opts
+	delete opts.cancelCtx  // just in case fetch opts do something weird inside with opts
+	let fetchProm
 
-	const controller = new AbortController()
-	opts.signal = controller.signal
+	// internally in ribu, if cancelProm() is called (see below in usage)
+		// checks for all the procs that use the ctx() and it and gen.return(), ie, goto finally{}
 
-	const response_Ch = Ch()
-
-	const proc = go(function* () {
+	go(function* () {
+		const controller = new AbortController()
 		try {
-			// ribu can interpret promises natively
-			// @todo: if ribu can interpret promises natively, just return it to caller?
-			const res = yield fetch(url, opts)
-			yield response_Ch.put(res)
+			opts.signal = controller.signal
+			fetchProm = fetch(url, opts)
 		}
 		catch (err) {
 			// the canceller already knows that the resource is cancelled so it can proceed accordingly, no need to throw
@@ -25,38 +42,30 @@ function ribuFetch(url, opts) {
 			throw err
 		}
 		finally {
-			// need to handle here instead of directly in handleCancel bc
-			// the proc needs to be removed as parent's child
 			controller.abort()
 		}
-	})
+	}, _cancelCtx)
 
-	go(function* handleCancel() {
-		const cancelCh = opts._cancel
-		yield cancelCh.rec
-		yield proc.cancel()
-		yield cancelCh.put()
-	})
-
-	return response_Ch
+	return fetchProm
 }
 
 
 // to use it
 go(function* main() {
-	// const resp = yield ribuFetch("http://example.com/movies.json").rec
+	// const resp = yield ribuFetch("http://example.com/movies.json")  // can yield chans directly as .rec
 
 	/*  or if i want to cancel manually: */
-	const [cancelProm, _cancel] = CancelCtx()
-	const res = ribuFetch("http://example.com/movies.json", {_cancel}).rec
+	const [cancelProm, _cancelCtx] = RibuCancelCtx()
+	const res = cancellableFetch("http://example.com/movies.json", {_cancelCtx})
 	yield cancelProm().rec  // cancelProm returns a channel fulfilled when cancelling is done
 
 	// another process can do $main.cancel() and the fetch will be auto-cancelled
 })
 
 
-function CancelCtx() {
+function RibuCancelCtx() {
 	const cancelCh = Ch()
+	const cancelCtx = new CancelCtx() // has pointers to procs
 
 	function startCancel() {
 		go(function* _startCancel() {
