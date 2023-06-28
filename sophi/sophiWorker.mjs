@@ -6,15 +6,7 @@ function* worker($locateFiles, testFileResult_Ch) {
 	let loadFileProcs = []
 	const testFileResult_Ch = Ch(100)
 
-	/*	weirdness: msgs to filesPathCh is done by original actor and worker (below)
-		- is this necessary? let's check
-		problem is that it is a bufferedChan, so there's data on the buffer.
-			so the worker needs to put a message DONE in the chan
-				- but it is ALWAYS best that the chan creator do it (upstream actor)
-
-	*/
-
-	/* IDEA: insead of "go(function* handleFilePath() {...}",
+	/* IDEA: instead of "go(function* handleFilePath() {...}",
 		this.$locateFiles.rec() {
 			... maybe even make it a class.
 		}
@@ -36,7 +28,7 @@ function* worker($locateFiles, testFileResult_Ch) {
 		/* cancel the rest of workers (and $upstream: more sending data) */
 		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
 		yield cancel(loadFileProcs, $locateFiles).rec  // cancels in parallel
-		go(flushQueue($locateFiles))  // flush chans is unnecessary 99%
+		go(flushQueue($locateFiles.filePathS))  // flush chans is unnecessary 99%
 		yield resumeWorker.put()  // resume only one worker
 	})
 }
@@ -53,9 +45,9 @@ function* processTestFile(filePath, onlyUsed_Ch) {
 }
 
 
-function* flushQueue($locateFiles) {
+function* flushQueue(filePathS) {
 	while (true) {
-		const filePath = yield $locateFiles.rec
+		const filePath = yield filePathS.rec
 		if (filePath === ribu.DONE) break
 		// do something with filePath
 	}
