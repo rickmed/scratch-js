@@ -1,7 +1,6 @@
 import { go, Ch } from "ribu"
 
-function cancellableFetch(url, opts) {
-	const cancelCtx = opts._cancelCtx
+function _fetch(url, opts) {
 	let prom
 
 	const proc = go(function* () {
@@ -18,19 +17,16 @@ function cancellableFetch(url, opts) {
 		// can also pass a normal function is no need for async
 		// this.cancel = () => controller.abort()
 
-	}, {cancelCtx})
+	}, opts._cancel ? {cancel: true} : undefined)
 
-	return prom
+	return [prom, proc.cancel.bind(proc)]
 }
 
 // to use it
 go(function* main() {
-	// const resp = yield ribuFetch("http://example.com/movies.json")  // ribu can yield proms natively
-
-	/*  or if i want to cancel manually: */
-	const [cancelProm, _cancelCtx] = CancelCtx()
-	const res = cancellableFetch("http://example.com/movies.json", {_cancelCtx})
-	yield cancelProm()  // cancelProm returns a channel fulfilled when cancelling is done
+	const [prom, cancelProm] = _fetch("http://example.com/movies.json", {_cancel: true})
+	yield prom
+	// yield cancelProm()  // cancelProm returns a channel fulfilled when cancelling is done
 
 	// another process can do $main.cancel() and the fetch will be auto-cancelled
 })
