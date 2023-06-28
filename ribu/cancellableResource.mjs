@@ -1,28 +1,27 @@
 import { go, Ch } from "ribu"
 
-/*
-	- ribu passes return[0] to caller and pulls out the return[1] to save internally for cancellation
-	- if you pass an async function for cancellation, ribu will
-		manage the promise but won't await it deadline comes first.
-	- automatic args passing can be abstracted later.
-*/
 function cancellableFetch(url, opts) {
-	const {_cancelCtx} = opts
-	delete opts._cancelCtx
+	const cancelCtx = opts._cancelCtx
+	let prom
 
-	return Resource((url, opts) => {
+	const proc = go(function* () {
 		const controller = new AbortController()
 		opts.signal = controller.signal
 
-		async function dispose() {
+		prom = fetch(url, opts)
+
+		this.cancel = function* () {
 			// controller.abort()  // imagine is not this but:
-			await server.close()
+			yield server.close()   // a prom
 		}
 
-		return [fetch(url, opts), dispose]
-	}, _cancelCtx)
-}
+		// can also pass a normal function is no need for async
+		// this.cancel = () => controller.abort()
 
+	}, {cancelCtx})
+
+	return prom
+}
 
 // to use it
 go(function* main() {
@@ -31,7 +30,7 @@ go(function* main() {
 	/*  or if i want to cancel manually: */
 	const [cancelProm, _cancelCtx] = CancelCtx()
 	const res = cancellableFetch("http://example.com/movies.json", {_cancelCtx})
-	yield cancelProm().rec  // cancelProm returns a channel fulfilled when cancelling is done
+	yield cancelProm()  // cancelProm returns a channel fulfilled when cancelling is done
 
 	// another process can do $main.cancel() and the fetch will be auto-cancelled
 })
