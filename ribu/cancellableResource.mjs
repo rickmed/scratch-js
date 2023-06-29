@@ -1,6 +1,7 @@
 import { go, Ch, onCancel } from "ribu"
 
-function _fetch(url, opts) {
+// @todo abstract this:
+function cancellableFetch(url, opts) {
 	let prom
 
 	/**
@@ -20,15 +21,14 @@ function _fetch(url, opts) {
 
 		// can also pass a normal function is no need for async
 		// this.cancel = () => controller.abort()
-
-	}, opts._cancel ? {cancel: 1000} : undefined)
+	})
 
 	return [prom, proc.cancel.bind(proc)]
 }
 
 // to use it
 go(function* main() {
-	const [prom, cancelProm] = _fetch("http://example.com/movies.json", {_cancel: true})
+	const [prom, cancelProm] = cancellableFetch("http://example.com/movies.json")
 	yield prom
 	// yield cancelProm()  // cancelProm returns a channel fulfilled when cancelling is done
 

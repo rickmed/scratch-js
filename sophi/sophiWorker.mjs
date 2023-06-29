@@ -1,5 +1,9 @@
-import {go, Ch} from "ribu"
+import {go, Ch, cancel} from "ribu"
 
+/*
+	Fix this whole file bc onlyUsed_Ch should be notified to sophiMain.js
+	otherwise, file processing in other workers won't be cancelled
+*/
 
 function* worker($upstream, $reporter) {
 	const onlyUsed_Ch = Ch()
@@ -8,7 +12,7 @@ function* worker($upstream, $reporter) {
 	go(function* handleFilePath() {
 		while (true) {
 			const filePath = yield $upstream.filePathS
-			const proc = go(processTestFile(filePath, onlyUsed_Ch))
+	const proc = go(processTestFile(filePath, onlyUsed_Ch))
 			loadFileProcs.push(proc)
 		}
 	})

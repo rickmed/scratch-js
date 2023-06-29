@@ -94,3 +94,17 @@ console.log(yielded)
 // yielded = gen.return() // 4, done: false
 // yielded = gen.next()  // 5, done:false
 // console.log(yielded)
+
+
+ 
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+const GenFnConstructor = function* () {}.constructor
+
+/** @type {(x: any) => boolean} */
+function isGenFn(x) {
+	if (x instanceof GenFnConstructor) {
+		return true
+	}
+	return false
+}

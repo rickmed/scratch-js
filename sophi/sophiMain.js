@@ -1,20 +1,17 @@
-import { go, Ch, workerGo } from "ribu"
+import { go, Ch, done, workerGo } from "ribu"
 
 
 go(function* main() {
 
-	const $locateFiles = go(locateFiles(sophiConfig), {filePathS: Ch(100), cancel: true})
-
 	const $reporter = go(reporter, {testResults: Ch(30)})
+	const $locateFiles = go(locateFiles(sophiConfig, $reporter), {filePathS: Ch(100), cancel: true})
 
-	let workers = Array(cpus().length)  // collect workers so I can wait for them when done
-	for (const workerId of [1,2,3,4]) {
-		const worker = workerGo("./sophiWorker.mjs", $locateFiles, $reporter)
-		workers.push(worker)
+	for (const workerId of range(cpus().length)) {
+		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
 	}
 
-
-	yield done($locateFiles, ...workers).rec
+	yield done()
+	console.log("sophi done. Goodbye")
 })
 
 
@@ -60,11 +57,18 @@ function* locateFiles(sophiConfig) {
 
 
 function* reporter() {
-	// print things
+	while (true) {
+		this.testResults.rec
+		// print things or whatever
+	}
 }
 
 
-
+function* range(start, end) {
+	for (let i = start; i <= end; i++) {
+	  yield i;
+	}
+ }
 
 
 
