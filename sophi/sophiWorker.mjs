@@ -1,34 +1,25 @@
 import {go, Ch} from "ribu"
 
 
-function* worker($locateFiles, testFileResult_Ch) {
+function* worker($upstream, $reporter) {
 	const onlyUsed_Ch = Ch()
 	let loadFileProcs = []
-	const testFileResult_Ch = Ch(100)
-
-	/* IDEA: instead of "go(function* handleFilePath() {...}",
-		this.$locateFiles.rec() {
-			... maybe even make it a class.
-		}
-
-	*/
 
 	go(function* handleFilePath() {
 		while (true) {
-			const filePath = yield $locateFiles.rec
+			const filePath = yield $upstream.filePathS
 			const proc = go(processTestFile(filePath, onlyUsed_Ch))
 			loadFileProcs.push(proc)
 		}
 	})
 
 	go(function* handleOnlyUsed() {
-
 		const [proc, resumeWorker] = yield onlyUsed_Ch.rec
 
 		/* cancel the rest of workers (and $upstream: more sending data) */
 		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-		yield cancel(loadFileProcs, $locateFiles).rec  // cancels in parallel
-		go(flushQueue($locateFiles.filePathS))  // flush chans is unnecessary 99%
+		yield cancel(loadFileProcs, $upstream).rec  // cancels in parallel
+		go(flushQueue($upstream.filePathS))  // flush chans is unnecessary 99%
 		yield resumeWorker.put()  // resume only one worker
 	})
 }

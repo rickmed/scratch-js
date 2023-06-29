@@ -1,23 +1,27 @@
-import { go, Ch } from "ribu"
+import { go, Ch, onCancel } from "ribu"
 
 function _fetch(url, opts) {
 	let prom
 
+	/**
+	 * @this {Ribu.Ports & {age: string}}
+	 * @type {Ribu.GenFn}
+	 */
 	const proc = go(function* () {
 		const controller = new AbortController()
 		opts.signal = controller.signal
 
 		prom = fetch(url, opts)
 
-		this.cancel = function* () {
+		onCancel(function* () {
 			// controller.abort()  // imagine is not this but:
 			yield server.close()   // a prom
-		}
+		})
 
 		// can also pass a normal function is no need for async
 		// this.cancel = () => controller.abort()
 
-	}, opts._cancel ? {cancel: true} : undefined)
+	}, opts._cancel ? {cancel: 1000} : undefined)
 
 	return [prom, proc.cancel.bind(proc)]
 }

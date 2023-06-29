@@ -5,15 +5,14 @@ go(function* main() {
 
 	const $locateFiles = go(locateFiles(sophiConfig), {filePathS: Ch(100), cancel: true})
 
-	const testFileResults_Ch = Ch(100)
+	const $reporter = go(reporter, {testResults: Ch(30)})
 
 	let workers = Array(cpus().length)  // collect workers so I can wait for them when done
 	for (const workerId of [1,2,3,4]) {
-		const worker = workerGo("./sophiWorker.mjs", $locateFiles, testFileResults_Ch)
+		const worker = workerGo("./sophiWorker.mjs", $locateFiles, $reporter)
 		workers.push(worker)
 	}
 
-	go(reporter(testFileResults_Ch))
 
 	yield done($locateFiles, ...workers).rec
 })
@@ -21,7 +20,7 @@ go(function* main() {
 
 function* locateFiles(sophiConfig) {
 	const {include: {folders, subStrings, extensions}} = sophiConfig
-	const {filePathS} = this.filePathS
+	const {filePathS} = this
 
 	for (const dir of sophiConfig.folders) {
 		go(readDir(dir))
@@ -52,15 +51,17 @@ function* locateFiles(sophiConfig) {
 		return false
 	}
 
-	this.cancel = function* () {
+	this.onCancel(function* () {
 		yield filePathS.put(ribu.DONE)
-	}
+	})
 }
 
 
 
 
-
+function* reporter() {
+	// print things
+}
 
 
 
