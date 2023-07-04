@@ -1,10 +1,10 @@
-import { go, Ch, done, workerGo } from "ribu"
+import { go, ch, done, workerGo, onCancel } from "ribu"
 
 
 go(function* main() {
 
-	const $reporter = go(reporter, {testResults: Ch(30)})
-	const $locateFiles = go(locateFiles(sophiConfig, $reporter), {filePathS: Ch(100), cancel: true})
+	const $reporter = go(reporter, {testResults: ch(30)})
+	const $locateFiles = go(locateFiles(sophiConfig), {filePathS: ch(30)})
 
 	for (const workerId of range(cpus().length)) {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
@@ -16,8 +16,8 @@ go(function* main() {
 
 
 function* locateFiles(sophiConfig) {
-	const {include: {folders, subStrings, extensions}} = sophiConfig
-	const {filePathS} = this
+	const { include: { folders, subStrings, extensions } } = sophiConfig
+	const { filePathS } = this
 
 	for (const dir of sophiConfig.folders) {
 		go(readDir(dir))
@@ -35,20 +35,7 @@ function* locateFiles(sophiConfig) {
 		}
 	}
 
-	function hasCorrectNamesAndExtensions(fileName) {
-		const fileExt = extname(fileName).slice(1)
-		if (!extensions.includes(fileExt)) {
-			return false
-		}
-		for (const str of subStrings) {
-			if (fileName.includes(str)) {
-				return true
-			}
-		}
-		return false
-	}
-
-	this.onCancel(function* () {
+	onCancel(function* () {
 		yield filePathS.put(ribu.DONE)
 	})
 }
@@ -66,12 +53,23 @@ function* reporter() {
 
 function* range(start, end) {
 	for (let i = start; i <= end; i++) {
-	  yield i;
+		yield i;
 	}
- }
+}
 
 
-
+function hasCorrectNamesAndExtensions(fileName) {
+	const fileExt = extname(fileName).slice(1)
+	if (!extensions.includes(fileExt)) {
+		return false
+	}
+	for (const str of subStrings) {
+		if (fileName.includes(str)) {
+			return true
+		}
+	}
+	return false
+}
 
 // /* === Ribu Higher level APIs */
 // go(function* main() {
