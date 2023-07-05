@@ -96,15 +96,15 @@ console.log(yielded)
 // console.log(yielded)
 
 
- 
-/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
 
-const GenFnConstructor = function* () {}.constructor
+/* +++ check if genFn    ++++++++++++++++++++++++++++++++++++++++++++++++++++ */
 
-/** @type {(x: any) => boolean} */
-function isGenFn(x) {
-	if (x instanceof GenFnConstructor) {
-		return true
-	}
-	return false
-}
+// const GenFnConstructor = function* () {}.constructor
+
+// /** @type {(x: any) => boolean} */
+// function isGenFn(x) {
+// 	if (x instanceof GenFnConstructor) {
+// 		return true
+// 	}
+// 	return false
+// }
