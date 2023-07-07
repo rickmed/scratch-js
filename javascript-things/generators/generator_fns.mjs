@@ -57,12 +57,14 @@
 
 // function* hi() {
 // 	console.log(this.hey)
+// 	yield
 // 	console.log(this.hey)
 // }
-// const thisObj = {hey: "76"}
-// const gen = hi.call(thisObj)
+// const obj = {hey: 2}
+// const gen = hi.call(obj)
 // // all the future next() calls are bound to the obj above
 // gen.next()
+// obj.hey = 5
 // gen.next()
 
 

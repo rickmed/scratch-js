@@ -1,4 +1,4 @@
-import { go, ch, done, workerGo, onCancel } from "ribu"
+import { go, ch, waitAll, workerGo, onCancel } from "ribu"
 
 
 go(function* main() {
@@ -10,7 +10,7 @@ go(function* main() {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
 	}
 
-	yield done()
+	yield waitChildren
 	console.log("sophi done. Goodbye")
 })
 

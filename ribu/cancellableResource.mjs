@@ -4,23 +4,13 @@ import { go, Ch, onCancel } from "ribu"
 function cancellableFetch(url, opts) {
 	let prom
 
-	/**
-	 * @this {Ribu.Ports & {age: string}}
-	 * @type {Ribu.GenFn}
-	 */
-	const proc = go(function* () {
+	const proc = goWait(function* _proc() {
 		const controller = new AbortController()
 		opts.signal = controller.signal
 
 		prom = fetch(url, opts)
 
-		onCancel(function* () {
-			// controller.abort()  // imagine is not this but:
-			yield server.close()   // a prom
-		})
-
-		// can also pass a normal function is no need for async
-		// this.cancel = () => controller.abort()
+		onCancel(() => controller.abort())
 	})
 
 	return [prom, proc.cancel.bind(proc)]
@@ -36,16 +26,74 @@ go(function* main() {
 })
 
 
-function CancelCtx() {
-	const cancelCh = Ch()
-	const cancelCtx = new CancelCtx() // has pointers to procs
 
-	function startCancel() {
-		go(function* _startCancel() {
-			yield cancelCh.put()
+/* could I reuse Prc.done like "yield this.done.put(file)"
+
+	Prc.done right now is .rec by:
+		proc.cancel()
+		done(proc)/done()
+		yield proc.done
+	and .put() by:
+		Prc when genReturn and cancelsDone
+*/
+function readFile(file, opts) {
+	const controller = new AbortController()
+	opts.signal = controller.signal
+	const _ch = ch()
+
+	goWait(function* () {
+		fs.readFile(file, opts, (err, file) => {
+			_ch.put(err ? err : file)
 		})
-		return cancelDone
-	}
+		onCancel(() => controller.abort())
+	})
 
-	[startCancel, cancelCh]
+	return _ch
+}
+
+
+// to use it
+go(function* main() {
+	const res = readFile("./package.json").rec
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/** @type {(ms: number) => SLEEP | never} */
+export function sleep(ms) {
+
+	const procBeingRan = /** @type {Prc} */ (csp.runningPrc)
+
+	go(function* _sleep() {  // eslint-disable-line require-yield
+
+		const timeoutID = setTimeout(() => {
+			procBeingRan.setResume()
+			procBeingRan.run()
+		}, ms)
+
+		onCancel(() => clearTimeout(timeoutID))
+	})
+
+	return SLEEP
+}
+
+// actor has a ch already created
+class readFile extends Actor {
+
 }
