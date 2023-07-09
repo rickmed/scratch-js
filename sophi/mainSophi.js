@@ -10,7 +10,7 @@ go(function* main() {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
 	}
 
-	yield waitChildren
+	const res = yield waitAll
 	console.log("sophi done. Goodbye")
 })
 

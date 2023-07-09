@@ -4,13 +4,13 @@ import { go, Ch, onCancel } from "ribu"
 function cancellableFetch(url, opts) {
 	let prom
 
-	const proc = goWait(function* _proc() {
+	const proc = goWait(function* () {
 		const controller = new AbortController()
 		opts.signal = controller.signal
 
 		prom = fetch(url, opts)
 
-		onCancel(() => controller.abort())
+		this.onCancel = () => controller.abort()
 	})
 
 	return [prom, proc.cancel.bind(proc)]
@@ -27,28 +27,24 @@ go(function* main() {
 
 
 
-/* could I reuse Prc.done like "yield this.done.put(file)"
+/*
 
-	Prc.done right now is .rec by:
-		proc.cancel()
-		done(proc)/done()
-		yield proc.done
-	and .put() by:
-		Prc when genReturn and cancelsDone
 */
+
 function readFile(file, opts) {
+
 	const controller = new AbortController()
 	opts.signal = controller.signal
-	const _ch = ch()
 
-	goWait(function* () {
+	// Passing a normal fn so that ribu can dissambiguate to not cancel immedately des not work
+		// bc I may want to have the full power of a genFn
+	return go(function () {
+		const {done} = this
 		fs.readFile(file, opts, (err, file) => {
-			_ch.put(err ? err : file)
+			done.put(err ? err : file)
 		})
-		onCancel(() => controller.abort())
-	})
-
-	return _ch
+		this.onCancel = () => controller.abort()
+	}).done
 }
 
 
@@ -75,25 +71,11 @@ go(function* main() {
 
 
 
-/** @type {(ms: number) => SLEEP | never} */
+/** @type {(ms: number) => Ch} */
 export function sleep(ms) {
-
-	const procBeingRan = /** @type {Prc} */ (csp.runningPrc)
-
-	go(function* _sleep() {  // eslint-disable-line require-yield
-
-		const timeoutID = setTimeout(() => {
-			procBeingRan.setResume()
-			procBeingRan.run()
-		}, ms)
-
-		onCancel(() => clearTimeout(timeoutID))
-	})
-
-	return SLEEP
-}
-
-// actor has a ch already created
-class readFile extends Actor {
-
+	return go(function* () {
+		const {done} = this
+		const timeoutID = setTimeout(done.put, ms)
+		this.onCancel = () => clearTimeout(timeoutID)
+	}).done.rec
 }
