@@ -1,4 +1,4 @@
-import { go, ch, waitAll, workerGo, onCancel } from "ribu"
+import { go, ch, waitAll, workerGo, onCancel, readdir, DONE } from "ribu"
 
 
 go(function* main() {
@@ -24,7 +24,7 @@ function* locateFiles(sophiConfig) {
 	}
 
 	function* readDir(dirPath) {
-		const entries = yield ribu.readdir(dirPath, { withFileTypes: true })
+		const entries = yield readdir(dirPath, { withFileTypes: true })
 		for (const entry of entries) {
 			if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
 				yield filePathS.put(entry.path)
@@ -36,7 +36,7 @@ function* locateFiles(sophiConfig) {
 	}
 
 	onCancel(function* () {
-		yield filePathS.put(ribu.DONE)
+		yield filePathS.put(DONE)
 	})
 }
 
@@ -75,3 +75,8 @@ function hasCorrectNamesAndExtensions(fileName) {
 // go(function* main() {
 // 	const [$locateFiles, $loadFiles] = yield forkPipe(locateFilesPath(this), worker())
 // })
+
+
+
+const $locateFiles = go(locateFiles(sophiConfig), {filePathS: ch(30)})
+const $locateFiles = goPorts(locateFiles, {filePathS: ch(30)}, sophiConfig)

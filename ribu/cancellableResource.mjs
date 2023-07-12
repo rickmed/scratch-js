@@ -1,18 +1,45 @@
-import { go, Ch, onCancel } from "ribu"
 
-// @todo abstract this:
-function cancellableFetch(url, opts) {
-	let prom
+import { go, ch, onCancel } from "ribu"
+import fs from "node:fs"
 
-	const proc = goWait(function* () {
-		const controller = new AbortController()
-		opts.signal = controller.signal
 
-		prom = fetch(url, opts)
 
-		this.onCancel = () => controller.abort()
+export function sleep(ms) {
+	// Cancellable doesn't run anything. But marks as child of last called go()
+	const proc = Cancellable(() => clearTimeout(timeoutID))
+	const timeoutID = setTimeout(proc.done.notify, ms)
+	return proc.done.rec
+}
+
+// to use it
+go(function* main() {
+	yield sleep(1).rec
+})
+
+
+
+function readFile_(file, opts) {
+	const controller = new AbortController()
+	opts.signal = controller.signal
+	const proc = Cancellable(() => controller.abort())
+	fs.readFile(file, opts, (err, file) => {
+		proc.done.notify(err ? err : file)
 	})
+	return proc.done
+}
 
+// to use it
+go(function* main() {
+	const res = yield readFile_("./package.json")
+})
+
+
+
+function cancellableFetch(url, opts) {
+	const controller = new AbortController()
+	opts.signal = controller.signal
+	const proc = Cancellable(() => controller.abort())
+	const prom = fetch(url, opts)
 	return [prom, proc.cancel.bind(proc)]
 }
 
@@ -26,56 +53,25 @@ go(function* main() {
 })
 
 
+function webSocket(url) {
+	const ws = new WebSocket(url)
+	const wsClosed = ch()
+	const data = ch()
 
-/*
+	const proc = Cancellable(function* _cancel() {
+		ws.close()
+		// at this point, no more "message" events are fired.
+		const reason = yield wsClosed.rec
+		yield proc.done.put(reason)  // the parent handles if errors.
+	})
 
-*/
-
-function readFile(file, opts) {
-
-	const controller = new AbortController()
-	opts.signal = controller.signal
-
-	// Passing a normal fn so that ribu can dissambiguate to not cancel immedately des not work
-		// bc I may want to have the full power of a genFn
-	return go(function () {
-		const {done} = this
-		fs.readFile(file, opts, (err, file) => {
-			done.put(err ? err : file)
-		})
-		this.onCancel = () => controller.abort()
-	}).done
-}
+	ws.addEventListener("close", wsClosed.notify)
+	ws.addEventListener("message", data.notify);
 
 
-// to use it
-go(function* main() {
-	const res = readFile("./package.json").rec
-})
+	ws.addEventListener("open", (event) => {
+		// ??
+	 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/** @type {(ms: number) => Ch} */
-export function sleep(ms) {
-	return go(function* () {
-		const {done} = this
-		const timeoutID = setTimeout(done.put, ms)
-		this.onCancel = () => clearTimeout(timeoutID)
-	}).done.rec
+	// return desired api to interface with ws
 }

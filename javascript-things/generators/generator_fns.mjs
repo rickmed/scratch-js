@@ -55,17 +55,17 @@
 
 /*** setting "this" used inside the gen ************************************ */
 
-// function* hi() {
-// 	console.log(this.hey)
-// 	yield
-// 	console.log(this.hey)
-// }
-// const obj = {hey: 2}
-// const gen = hi.call(obj)
-// // all the future next() calls are bound to the obj above
-// gen.next()
-// obj.hey = 5
-// gen.next()
+function* hi() {
+	console.log(this.hey)
+	yield
+	console.log(this.hey)
+}
+const obj = {hey: 2}
+const gen = hi.call(obj)
+// all the future next() calls are bound to the obj above
+gen.next()
+obj.hey = 5
+gen.next()
 
 
 
