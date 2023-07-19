@@ -1,3 +1,4 @@
+let yielded
 /*** Generator functions general usage of .next() *************************** */
 
 // function* hey() {
@@ -61,12 +62,12 @@ function* hi() {
 	console.log(this.hey)
 }
 const obj = {hey: 2}
-const gen = hi.call(obj)
+const gen3 = hi.call(obj)
 // all the future next() calls are bound to the obj above
-gen.next()
+gen3.next()
 obj.hey = 5
-gen.next()
-
+yielded = gen3.next()
+console.log("sone", yielded)
 
 
 /*** gen.return() and try/finally ******************************************* */
@@ -83,13 +84,11 @@ function* genfn() {
  }
 
 const gen = genfn()
-gen.next()
+gen3.next()
 
-let yielded
-
-yielded = gen.next()  //  -> 2, done: false
-yielded = gen.return() // ->  4, done: false
-yielded = gen.return()  //  -> undefined, done: true
+yielded = gen3.next()  //  -> 2, done: false
+yielded = gen3.return() // ->  4, done: false
+yielded = gen3.return()  //  -> undefined, done: true
 console.log(yielded)
 
 // yielded = gen.next()  // 2, done: false

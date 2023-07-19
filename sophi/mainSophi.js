@@ -1,10 +1,11 @@
-import { go, ch, waitAll, workerGo, onCancel, readdir, DONE } from "ribu"
+import { go, Go, ch, waitAll, workerGo, readdir, DONE, onCancel } from "ribu"
 
 
 go(function* main() {
+	const sophiConfig = {}
 
-	const $reporter = go(reporter, {testResults: ch(30)})
-	const $locateFiles = go(locateFiles(sophiConfig), {filePathS: ch(30)})
+	const $locateFiles = Go({filePathS: ch(30)}, locateFiles, sophiConfig)
+	const $reporter = Go({testResults: ch(30)}, reporter)
 
 	for (const workerId of range(cpus().length)) {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
@@ -36,7 +37,7 @@ function* locateFiles(sophiConfig) {
 	}
 
 	onCancel(function* () {
-		yield filePathS.put(DONE)
+		yield filePathS.close()
 	})
 }
 
@@ -50,12 +51,6 @@ function* reporter() {
 	}
 }
 
-
-function* range(start, end) {
-	for (let i = start; i <= end; i++) {
-		yield i;
-	}
-}
 
 
 function hasCorrectNamesAndExtensions(fileName) {
@@ -75,8 +70,3 @@ function hasCorrectNamesAndExtensions(fileName) {
 // go(function* main() {
 // 	const [$locateFiles, $loadFiles] = yield forkPipe(locateFilesPath(this), worker())
 // })
-
-
-
-const $locateFiles = go(locateFiles(sophiConfig), {filePathS: ch(30)})
-const $locateFiles = goPorts(locateFiles, {filePathS: ch(30)}, sophiConfig)

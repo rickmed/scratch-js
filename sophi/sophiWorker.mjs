@@ -1,4 +1,4 @@
-import { go, Ch, cancel } from "ribu"
+import { go, Go, Ch, wait, cancel } from "ribu"
 
 /*
 	Fix this whole file bc onlyUsed_Ch should be notified to sophiMain.js
@@ -6,35 +6,40 @@ import { go, Ch, cancel } from "ribu"
 */
 
 function* worker($upstream, $reporter) {
-	const onlyUsed_Ch = Ch()
+	const onlyUsedCh = Ch()
+	const resumeCh = Ch()
 	let loadFileProcs = []
 
 	go(function* handleFilePath() {
 		while (true) {
 			const filePath = yield $upstream.filePathS
-			const proc = go(processTestFile(filePath, onlyUsed_Ch))
+			const proc = go(processTestFile, filePath, onlyUsedCh)
 			loadFileProcs.push(proc)
 		}
 	})
 
 	go(function* handleOnlyUsed() {
-		const [proc, resumeWorker] = yield onlyUsed_Ch.rec
+		const proc = yield onlyUsedCh
 
-		/* cancel the rest of workers (and $upstream: more sending data) */
+		/* cancel the rest of workers (and $upstream from sending more data) */
 		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-		yield cancel(loadFileProcs, $upstream).rec  // cancels in parallel
-		go(flushQueue($upstream.filePathS))  // flush chans is unnecessary 99%
-		yield resumeWorker.put()  // resume only one worker
+		yield cancel(loadFileProcs, $upstream)
+
+		go(flushQueue($upstream.filePathS))  // flush chans is almost always unnecessary
+		yield resumeCh.put()  // resume only one worker
 	})
+
+	// here I need to wait for all children to finish.
+	const res = yield wait()
 }
 
 
-function* processTestFile(filePath, onlyUsed_Ch) {
-	const onlyUsed = yield process(filePath)  // actually process the filePath
+function* processTestFile(filePath, onlyUsedCh, resumeCh) {
+	const onlyUsed = yield fileSuite(filePath)
 	if (onlyUsed) {
 		const shouldResume = Ch()
-		yield onlyUsed_Ch.put([this, shouldResume])
-		yield shouldResume.rec
+		yield onlyUsedCh.put(this)
+		yield resumeCh
 		// if I continue here it means I wasn't cancelled
 	}
 }

@@ -9,6 +9,5 @@ try {
 	await test()
 }
 catch(e) {
-	console.log("caatch")
-	console.log(e)
+	console.log("catched! ", e)
 }

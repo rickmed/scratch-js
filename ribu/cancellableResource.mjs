@@ -7,7 +7,7 @@ import fs from "node:fs"
 export function sleep(ms) {
 	// Cancellable doesn't run anything. But marks as child of last called go()
 	const proc = Cancellable(() => clearTimeout(timeoutID))
-	const timeoutID = setTimeout(proc.done.notify, ms)
+	const timeoutID = setTimeout(proc.done.dispatch, ms)
 	return proc.done.rec
 }
 
@@ -23,7 +23,7 @@ function readFile_(file, opts) {
 	opts.signal = controller.signal
 	const proc = Cancellable(() => controller.abort())
 	fs.readFile(file, opts, (err, file) => {
-		proc.done.notify(err ? err : file)
+		proc.done.dispatch(err ? err : file)
 	})
 	return proc.done
 }
@@ -65,8 +65,8 @@ function webSocket(url) {
 		yield proc.done.put(reason)  // the parent handles if errors.
 	})
 
-	ws.addEventListener("close", wsClosed.notify)
-	ws.addEventListener("message", data.notify);
+	ws.addEventListener("close", wsClosed.dispatch)
+	ws.addEventListener("message", data.dispatch);
 
 
 	ws.addEventListener("open", (event) => {
@@ -75,3 +75,11 @@ function webSocket(url) {
 
 	// return desired api to interface with ws
 }
+
+
+
+export function Go<GenFnArgs, OptKs extends string>(
+	opt: Opt<OptKs>,
+	genFn: GenFn<GenFnArgs, Opt<OptKs>>,
+	...genFnArgs: GenFnArgs[]
+): Proc<OptKs> {
