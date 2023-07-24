@@ -1,4 +1,4 @@
-import { go, Go, Ch, wait, cancel } from "ribu"
+import { go, Go, Ch, wait, cancel, DONE } from "ribu"
 
 /*
 	Fix this whole file bc onlyUsed_Ch should be notified to sophiMain.js
@@ -8,7 +8,7 @@ import { go, Go, Ch, wait, cancel } from "ribu"
 function* worker($upstream, $reporter) {
 	const onlyUsedCh = Ch()
 	const resumeCh = Ch()
-	let loadFileProcs = []
+	let loadFileProcs: unknown[] = []
 
 	go(function* handleFilePath() {
 		while (true) {
@@ -45,10 +45,10 @@ function* processTestFile(filePath, onlyUsedCh, resumeCh) {
 }
 
 
-function* flushQueue(filePathS) {
+async function flushQueue(filePathS) {
 	while (true) {
-		const filePath = yield filePathS.rec
-		if (filePath === ribu.DONE) break
+		const filePath = await filePathS.rec
+		if (filePath === DONE) return
 		// do something with filePath
 	}
 }

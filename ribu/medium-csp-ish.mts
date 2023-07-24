@@ -26,11 +26,6 @@ const fixed = limit => ({
 })
 
 
-
-
-
-
-
 function ch<ChV>(n = 1) {
 
 	const buffer = fixed(n)
@@ -39,7 +34,6 @@ function ch<ChV>(n = 1) {
 		buffer,
 		isClosed: false,
 		takes: [],
-		// then: (x: (value: unknown) => void, y: (value: unknown) => void) => take(ch).then(x, y)   // this is bc a "await ch" is an implicit take
 		then(x, y) {
 			take(ch).then(x, y)
 		}
@@ -49,16 +43,11 @@ function ch<ChV>(n = 1) {
 }
 
 
-
-
 function take(ch) {
-
-	console.log("taking")
 
 	var take = createAction()
 	var put = !ch.buffer.alwaysUse && ch.buffer.shift()
 
-	// implicit ch
 	// if (put && put.then) {
 	// 	return put.then(_put => {
 	// 		run(ch, _put, take)
@@ -112,29 +101,77 @@ function createAction(config = {}) {
 }
 
 
+/* Use it */
+
+// const ch1 = ch<string>()
+
+// async function child() {
+// 	const res = await put(ch1, "yo")
+// }
+
+// async function main() {
+// 	child()
+// 	const x = await ch1
+// 	console.log(x)
+// }
+
+
+// main()
 
 
 
+const player = async (name, table) => {
+  while (true) {
 
+    const ball = await take(table)
+    if (ball === CLOSED) break
 
-
-
-
-
-const ch1 = ch<string>()
-
-async function child() {
-	const res = await put(ch1, "yo")
-	console.log("child done", res)
+    ball.hits++
+    console.log(`${name} ${ball.hits}`)
+    await sleep(100)
+    put(table, ball)
+  }
 }
 
-async function main() {
-	child()
-	console.log("child launched")
-	console.log(ch1)
-	const x = await ch1
-	console.log(x)
+const start = async () => {
+
+  const table = chan()
+
+  player('ping', table)
+  player('pong', table)
+
+  put(table, { hits: 0 })
+  await sleep(1000)
+
+  close(table)
 }
 
+start()
 
-main()
+
+
+const player = async (name, table) => {
+	while (true) {
+	  const ball = await take(table)
+	  
+	  ball.hits++
+	  console.log(`${name} ${ball.hits}`)
+	  await sleep(100)
+	  put(table, ball)
+	}
+ }
+
+ const start = async () => {
+
+	const table = chan()
+
+	const p1 = player('ping', table)
+	const p2 = player('pong', table)
+
+	put(table, { hits: 0 })
+	await sleep(1000)
+
+	await cancel(p1, p2)
+ }
+
+ start()

@@ -1,11 +1,11 @@
-import { go, Go, ch, waitAll, workerGo, readdir, DONE, onCancel } from "ribu"
+import { go, ch, waitAll, workerGo, readdir, DONE, onCancel } from "ribu"
 
 
 go(function* main() {
 	const sophiConfig = {}
 
-	const $locateFiles = Go({filePathS: ch(30)}, locateFiles, sophiConfig)
-	const $reporter = Go({testResults: ch(30)}, reporter)
+	const $locateFiles = locateFiles(sophiConfig)
+	const $reporter = go(reporter)
 
 	for (const workerId of range(cpus().length)) {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
@@ -16,35 +16,40 @@ go(function* main() {
 })
 
 
-function* locateFiles(sophiConfig) {
+function locateFiles(sophiConfig) {
+
 	const { include: { folders, subStrings, extensions } } = sophiConfig
-	const { filePathS } = this
+	const filePathS = ch<string>(30)
 
-	for (const dir of sophiConfig.folders) {
-		go(readDir(dir))
-	}
+	return go(async function locateFiles() {
 
-	function* readDir(dirPath) {
-		const entries = yield readdir(dirPath, { withFileTypes: true })
-		for (const entry of entries) {
-			if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
-				yield filePathS.put(entry.path)
-			}
-			if (entry.isDirectory()) {
-				go(readDir(entry.path))
+		for (const dir of sophiConfig.folders) {
+			go(readDir(dir))
+		}
+
+		async function readDir(dirPath) {
+			const entries = await readdir(dirPath, {withFileTypes: true})
+			for (const entry of entries) {
+				if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
+					await filePathS.put(entry.path)
+				}
+				if (entry.isDirectory()) {
+					go(readDir(entry.path))
+				}
 			}
 		}
-	}
 
-	onCancel(function* () {
-		yield filePathS.close()
-	})
+		onCancel(async function () {
+			await filePathS.put(DONE)
+		})
+
+	}).ports({filePathS})
 }
 
 
 
 
-function* reporter() {
+function reporter() {
 	while (true) {
 		this.testResults.rec
 		// print things or whatever
