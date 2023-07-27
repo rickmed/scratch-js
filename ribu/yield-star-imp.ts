@@ -1,4 +1,5 @@
-import fs from "node:fs/promises"
+import { go, ch, onCancel, Cancellable } from "ribu"
+import fs from "node:fs"
 
 /*
 I'm investigating this bc:
@@ -72,18 +73,7 @@ console.log("PROGRAM DONE")
 
 
 
-
-function cancellableFetch(url, opts) {
-	const controller = new AbortController()
-	opts.signal = controller.signal
-
-	const proc = Cancellable(() => controller.abort())
-
-	const prom = fetch(url, opts)
-
-	return [prom, proc.cancel.bind(proc)]
-}
-
+/**** Cancellable Things */
 
 function CancellableFetch(url, opts) {
 	return go(function* () {
@@ -99,7 +89,7 @@ function CancellableFetch(url, opts) {
 
 
 go(function* main() {
-	const result = yield* CancellableFetch("api.com/users", {method: "POST"}).rec  // .rec is just get rec() { this.done.rec }
+	const result = yield* CancellableFetch("api.com/users", {method: "POST"}).rec  // .rec is just get rec() { this.done.rec } on Prc
 
 	// const [done, cancelProm] = CancellableFetch("api.com/users", {method: "POST"})
 	// const result = yield* done.rec  // or just "done" if implicit receiving is implemented
@@ -107,8 +97,26 @@ go(function* main() {
 })
 
 
+//// Wrap Callback based
 
-/**** Other cb based  */
+
+function readFile_(file, opts) {
+	const prc =  go(function* () {
+		const controller = new AbortController()
+		opts.signal = controller.signal
+
+		onCancel(() => controller.abort())
+
+		fs.readFile(file, opts, (err, file) => {
+			prc.done.dispatch(err ? err : file)
+		})
+	})
+
+	return prc
+}
+
+//// Cancellable websockets.
+//
 
 function webSocket(url) {
 
@@ -116,12 +124,14 @@ function webSocket(url) {
 	const wsClosed = ch()
 	const data = ch()
 
-	const proc = Cancellable(async function _cancel() {
+	const prc = go(function _cancel() {
 		ws.close()
 		// at this point, no more "message" events are fired.
 		const reason = await wsClosed
-		await proc.done.put(reason)  // the parent handles if errors.
+		await prc.done.put(reason)  // the parent handles if errors.
 	})
+
+	ws.send("msg to server")   // ???
 
 	ws.addEventListener("close", wsClosed.dispatch)
 	ws.addEventListener("message", data.dispatch);
