@@ -12,7 +12,10 @@ function* worker($upstream, $reporter) {
 
 	go(function* handleFilePath() {
 		while (true) {
-			const filePath = yield $upstream.filePathS
+			const filePath = yield $upstream.filePathS.rec
+			if (filePath === DONE) {
+				// I know it's 
+			}
 			const proc = go(processTestFile, filePath, onlyUsedCh)
 			loadFileProcs.push(proc)
 		}

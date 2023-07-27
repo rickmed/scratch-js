@@ -2,13 +2,7 @@ import { go, ch, onCancel, Cancellable } from "ribu"
 import fs from "node:fs"
 
 /*
-	I could wrap someIO to set appropiate csp no problem
 
-	Problem is that sleep(3) might get some wrong prc and set _timeout to wrong
-	prc. When prc.cancel(), prc deletes a wrong _timeout
-
-	thinking that using *this* (or a "me" 1st param) for chans/sleep could be a solution
-		since they have a pre access to prc.
 
 */
 
@@ -28,6 +22,8 @@ go(async function main() {
 	await promSleep(2)
 	const rec = await ch1
 })
+
+
 
 // need to get the environment runningPrc
 // and set it when wrapped callback runs
@@ -95,9 +91,6 @@ function webSocket(url) {
 	const ws = new WebSocket(url)
 	const wsClosed = ch()
 	const data = ch()
-
-
-
 
 	const proc = Cancellable(async function _cancel() {
 		ws.close()

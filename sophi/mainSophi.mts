@@ -21,17 +21,18 @@ function locateFiles(sophiConfig) {
 	const { include: { folders, subStrings, extensions } } = sophiConfig
 	const filePathS = ch<string>(30)
 
-	return go(async function locateFiles() {
+	return go(function* locateFiles() {
 
 		for (const dir of sophiConfig.folders) {
 			go(readDir(dir))
 		}
 
-		async function readDir(dirPath) {
-			const entries = await readdir(dirPath, {withFileTypes: true})
+		function* readDir(dirPath) {
+			const entries = yield* readdir(dirPath, {withFileTypes: true})
+			// entries can be an error, maybe readdir can return a ch<file | err>
 			for (const entry of entries) {
 				if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
-					await filePathS.put(entry.path)
+					yield* filePathS.put(entry.path)
 				}
 				if (entry.isDirectory()) {
 					go(readDir(entry.path))
@@ -39,8 +40,8 @@ function locateFiles(sophiConfig) {
 			}
 		}
 
-		onCancel(async function () {
-			await filePathS.put(DONE)
+		onCancel(function* () {
+			yield* filePathS.put(DONE)
 		})
 
 	}).ports({filePathS})

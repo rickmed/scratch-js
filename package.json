@@ -4,6 +4,7 @@
     "#mymod": "./import_modules/module1.js"
   },
   "dependencies": {
+    "effect": "^2.0.0-next.21",
     "expect": "^29.4.3",
     "undici": "^5.22.1",
     "zod": "^3.20.6"
