@@ -14,7 +14,7 @@ function* worker($upstream, $reporter) {
 		while (true) {
 			const filePath = yield $upstream.filePathS.rec
 			if (filePath === DONE) {
-				// I know it's 
+				// I know it's
 			}
 			const proc = go(processTestFile, filePath, onlyUsedCh)
 			loadFileProcs.push(proc)
@@ -26,7 +26,7 @@ function* worker($upstream, $reporter) {
 
 		/* cancel the rest of workers (and $upstream from sending more data) */
 		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-		yield cancel(loadFileProcs, $upstream)
+		yield* cancel(loadFileProcs, $upstream)
 
 		go(flushQueue($upstream.filePathS))  // flush chans is almost always unnecessary
 		yield resumeCh.put()  // resume only one worker

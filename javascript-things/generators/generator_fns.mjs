@@ -41,9 +41,9 @@ let yielded
 // 		return "done"
 // 	}
 // }
-
+//
 // const genObj = gen1()
-
+//
 // let yielded;
 // yielded = genObj.next()
 // console.log(yielded)
@@ -56,41 +56,41 @@ let yielded
 
 /*** setting "this" used inside the gen ************************************ */
 
-function* hi() {
-	console.log(this.hey)
-	yield
-	console.log(this.hey)
-}
-const obj = {hey: 2}
-const gen3 = hi.call(obj)
-// all the future next() calls are bound to the obj above
-gen3.next()
-obj.hey = 5
-yielded = gen3.next()
-console.log("sone", yielded)
+// function* hi() {
+// 	console.log(this.hey)
+// 	yield
+// 	console.log(this.hey)
+// }
+// const obj = {hey: 2}
+// const gen3 = hi.call(obj)
+// // all the future next() calls are bound to the obj above
+// gen3.next()
+// obj.hey = 5
+// yielded = gen3.next()
+// console.log("sone", yielded)
 
 
 /*** gen.return() and try/finally ******************************************* */
 
-function* genfn() {
-	yield 1;
-	try {
-	  yield 2;
-	  yield 3;
-	} finally {
-	  yield 4
-	  yield 5
-	}
- }
+// function* genfn() {
+// 	yield 1;
+// 	try {
+// 	  yield 2;
+// 	  yield 3;
+// 	} finally {
+// 	  yield 4
+// 	  yield 5
+// 	}
+//  }
 
-const gen = genfn()
-gen3.next()
+// const gen = genfn()
+// gen3.next()
 
-yielded = gen3.next()  //  -> 2, done: false
-yielded = gen3.return() // ->  4, done: false
-yielded = gen3.return()  //  -> undefined, done: true
-console.log(yielded)
-
+// yielded = gen3.next()  //  -> 2, done: false
+// yielded = gen3.return() // ->  4, done: false
+// yielded = gen3.return()  //  -> undefined, done: true
+// console.log(yielded)
+//
 // yielded = gen.next()  // 2, done: false
 // yielded = gen.return() // 4, done: false
 // yielded = gen.next()  // 5, done:false
@@ -109,3 +109,22 @@ console.log(yielded)
 // 	}
 // 	return false
 // }
+
+
+/* +++ .next() after .return()     ++++++++++++++++++++++++++++++++++++++++++ */
+// function* genFn() {
+// 	yield 1
+// }
+
+// const gen = genFn()
+// let val
+// val = gen.return()
+// console.log(val)
+// val = gen.return()
+// console.log(val)
+// val = gen.next()
+// console.log(val)
+// val = gen.next()
+// console.log(val)
+
+// // all prints { value: undefined, done: true }
