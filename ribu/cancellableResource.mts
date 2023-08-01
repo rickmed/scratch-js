@@ -1,9 +1,9 @@
 import { go, ch, onCancel, Cancellable } from "ribu"
-import {readdir} from "node:fs/promises"
+import { readdir } from "node:fs/promises"
 import fs from "node:fs"
 
 
-/** With this I loose manual cancellation */
+/** This option loses manual cancellation */
 function* simpleProm(dirPath, opts) {
 
 	const controller = new AbortController()
@@ -12,7 +12,8 @@ function* simpleProm(dirPath, opts) {
 	onCancel(() => controller.abort())  // if onCancel() is called on main, this will throw
 
 	try {
-		const entries = yield readdir(dirPath, opts)  // ribu can manage promises natively.
+		const entries = yield readdir(dirPath, opts)  // ribu manages promises natively.
+
 		// need to implement return vals to use Prc.done and not create another ch here internally
 		return entries as Awaited<ReturnType<typeof readdir>>
 	}
@@ -25,24 +26,28 @@ function* simpleProm(dirPath, opts) {
 
 function CancellableProm(dirPath, opts) {
 	return go(function* () {
+
 		const controller = new AbortController()
 		opts.signal = controller.signal
 
-		onCancel(() => controller.abort())
+		try {
+			const entries = yield readdir(dirPath, opts)  // ribu manages promises natively.
 
-		const entries = yield readdir(dirPath, opts)  // ribu can manage promises natively.
-
-		// need to implement return vals to use Prc.done and not create another ch here internally
-		return entries as Awaited<ReturnType<typeof readdir>>
-	}).done.rec
+			// need to implement return vals to use Prc.done and not create another ch here internally
+			return entries as Awaited<ReturnType<typeof readdir>>
+		}
+		catch (e) {
+			return e as Error
+		}
+	})
 }
 
 
 go(function* main() {
 
-	// const result = yield* CancellableFetch("api.com/users", {method: "POST"})
+	const result = yield* CancellableProm("api.com/users", {method: "POST"})
 
-	const result = yield* simpleProm("api.com/users", {method: "POST"})
+	// const result = yield* simpleProm("api.com/users", { method: "POST" })
 
 
 	// const [done, cancelProm] = CancellableFetch("api.com/users", {method: "POST"})

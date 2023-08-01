@@ -1,4 +1,7 @@
+#!sudo /usr/local/bin/tsx
+
 let yielded
+
 /*** Generator functions general usage of .next() *************************** */
 
 // function* hey() {
@@ -112,6 +115,7 @@ let yielded
 
 
 /* +++ .next() after .return()     ++++++++++++++++++++++++++++++++++++++++++ */
+
 // function* genFn() {
 // 	yield 1
 // }
@@ -128,3 +132,24 @@ let yielded
 // console.log(val)
 
 // // all prints { value: undefined, done: true }
+
+
+/* +++ delegate generator    ++++++++++++++++++++++++++++++++++++++++++ */
+
+function* sub() {
+	yield 1
+	yield 2
+	return 3
+}
+
+function* main() {
+	const res = yield* sub()
+	console.log({res})
+	return "MAIN DONE"
+}
+
+const gen = main()
+yielded = gen.next()
+console.log(yielded)
+yielded = gen.return("THIS")  // return "MAIN DONE" never executes
+console.log(yielded)

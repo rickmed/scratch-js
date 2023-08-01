@@ -1,4 +1,4 @@
-import { go, ch, waitAll, workerGo, readdir, DONE, onCancel } from "ribu"
+import { go, chBuff, waitErr, workerGo, readdir, DONE, onCancel } from "ribu"
 
 
 go(function* main() {
@@ -11,7 +11,7 @@ go(function* main() {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
 	}
 
-	const res = yield waitAll
+	const res = yield waitErr($locateFiles, $reporter)
 	console.log("sophi done. Goodbye")
 })
 
@@ -19,7 +19,7 @@ go(function* main() {
 function locateFiles(sophiConfig) {
 
 	const { include: { folders, subStrings, extensions } } = sophiConfig
-	const filePathS = ch<string>(30)
+	const filePathS = chBuff<string>(30)
 
 	return go(function* locateFiles() {
 

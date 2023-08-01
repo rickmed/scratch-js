@@ -1,4 +1,4 @@
-import { go, Go, Ch, wait, cancel, DONE } from "ribu"
+import { go, Go, Ch, waitAll, cancel, DONE } from "ribu"
 
 /*
 	Fix this whole file bc onlyUsed_Ch should be notified to sophiMain.js
@@ -33,7 +33,7 @@ function* worker($upstream, $reporter) {
 	})
 
 	// here I need to wait for all children to finish.
-	const res = yield wait()
+	const res = yield waitAll
 }
 
 
