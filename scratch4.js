@@ -69,3 +69,29 @@
 	export csp object to user.
 
 */
+
+
+function greet() {
+	console.log(this.name)
+}
+
+function Person(name) {
+	let obj = {name}
+	obj.__proto__.greet = greet
+	return obj
+}
+
+// const p = Person("rick")
+// console.log(Object.getOwnPropertyNames(p.__proto__))
+
+
+function Person2(name) {
+	this.name = name
+}
+
+Person2.prototype.greet = greet
+
+const p2 = new Person2("rick")
+console.log(Object.getOwnPropertyNames(p2.__proto__.__proto__))
+
+p2.greet()

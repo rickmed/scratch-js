@@ -51,19 +51,21 @@ go(function* main() {
 
 
 
-
-
-
-export type GetOverloadArgs<T> =
-	T extends { (...o: infer U): void, (...o: infer U2): void, (...o: infer U3): void } ? U | U2 | U3 :
-	T extends { (...o: infer U): void, (...o: infer U2): void } ? U | U2 :
-	T extends { (...o: infer U): void } ? U : never
+// https://stackoverflow.com/questions/51650979/type-inference-with-overloaded-functions?rq=3
 
 type Gen<Ret> = Generator<"PARK", Ret, Ret>
 
+// gets the parameters of Fn overloads. One tuple per overload.
+// -> [overloadParams]
+export type OverloadArgs<Fn> =
+	Fn extends { (...o: infer U): void, (...o: infer U2): void, (...o: infer U3): void } ? U | U2 | U3 :
+	Fn extends { (...o: infer U): void, (...o: infer U2): void } ? U | U2 :
+	Fn extends { (...o: infer U): void } ? U : never
+
+
 export type Callback<R> = (err: Error | null, result: R) => void;
 
-export type CBResult<T extends any[]> =
+export type ToGenFn<T extends any[]> =
 	T extends [Callback<infer R>?] ? () => Gen<R> :
 	T extends [infer T1, Callback<infer R>?] ? (arg1: T1) => Gen<R> :
 	T extends [infer T1, infer T2, Callback<infer R>?] ? (arg1: T1, arg2: T2) => Gen<R> :
@@ -73,32 +75,43 @@ export type CBResult<T extends any[]> =
 
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
 
-export type ToGen<T> = UnionToIntersection<CBResult<GetOverloadArgs<T>>>
+export type ToGen<T> = UnionToIntersection<ToGenFn<OverloadArgs<T>>>
 
 // Sample
 declare const readFileGen: ToGen<typeof readFile>
 let y = readFileGen("foo.txt", "utf8")
 
 
-function toGen<T extends Function>(cbBasedFn: T): ToGen<T> {
+export type Res<Args extends any[]> =
+	Args extends [Callback<infer R>?] ? Gen<R> :
+	Args extends [infer T1, Callback<infer R>?] ? Gen<R> :
+	Args extends [infer T1, infer T2, Callback<infer R>?] ? Gen<R> :
+	Args extends [infer T1, infer T2, infer T3, Callback<infer R>?] ? Gen<R> :
+	Args extends [infer T1, infer T2, infer T3, infer T4, Callback<infer R>?] ? Gen<R> :
+	Args;
 
-	return function* subGen(...args: GetOverloadArgs<T>) {
+type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
-		function cb(err, result) { // our custom callback for f (**)
-			// resume myself
-		}
+function* toGen<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
-		args.push(cb)
-		cbBasedFn(...args)
-
-		const x = yield "PARK"
-		return x
+	function cb(err, result) {
+		// resume runningPrc
 	}
+
+	args.push(cb)
+	cbBasedFn(...args)
+
+	const x = yield "PARK"
+	return x
 }
 
 function* main() {
-	const res = yield* toGen(readFile)("foo.txt", { encoding: "utf8" })
+	const res = yield* toGen(readFile, "foo.txt", { encoding: "utf8" })
 }
+
+
+
+
 
 
 /* Auto wrapping all functions */
@@ -166,8 +179,12 @@ function CancellableWebSocket(url) {
 		yield* prc.done.put(reason)  // the parent handles if errors.
 	})
 
-	ws.addEventListener("close", wsClosed.enQueue)
-	ws.addEventListener("message", fromServer.enQueue);
+	ws.addEventListener("close", () => {
+		wsClosed.resumeReceivers()
+	})
+	ws.addEventListener("message", msg => {
+		fromServer.resumeReceivers(msg) // all waiters should be called with same msg
+	});
 
 	ws.addEventListener("open", (event) => {
 		// ??

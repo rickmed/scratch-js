@@ -17,7 +17,7 @@ type OverLoadsArgsRF = GetOverloadArgs<typeof readFile>
 type PromisifyRF = PromisifyOne<OverLoadsArgsRF>
 
 
-export type Callback<R> = (err: Error | null, result: R) => void;
+export type Callback<R = any> = (err: Error | null, result: R) => void;
 
 export type PromisifyOne<T extends any[]> =
     T extends [Callback<infer R>?] ? () => Promise<R> :
@@ -36,5 +36,4 @@ export type Promisify<T> = UnionToIntersection<PromisifyOne<GetOverloadArgs<T>>>
 // Sample
 declare const readFileProm: Promisify<typeof readFile>
 
-let y = readFileProm("foo.txt", "utf8")
-
+let y = readFileProm("foo.txt")

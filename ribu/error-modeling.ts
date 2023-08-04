@@ -1,45 +1,41 @@
-class MyErr<Tag extends string = string> extends Error {
-	tag: Tag
-	constructor(tag: Tag) {
+class RibuErr<Tag extends string = string> extends Error {
+	constructor(readonly tag: Tag) {
 		super()
-		this.tag = tag
 	}
 }
 
-function child(x: number) {
+function Err<T extends string>(tag: T): RibuErr<T> {
+	return new RibuErr(tag)
+}
+
+function fn(x: number) {
 	if (x % 3 === 0) {
 		return "normal return"
 	}
 	if (x % 2 === 0) {
-		return new MyErr("ENOENT")
+		return Err("ENOENT")
 	}
-	return new MyErr("OTHER")
+	return Err("OTHER")
 }
 
 function main() {
-	const res = child(1)
-	if (err(res, "ENOENT")) {
-		const x = res  // x should be MyErr("ENOENT"), OK
-		return x
+	const res = fn(1)
+	if (err(res)) {
+		if (res.tag === "ENOENT") {
+			return res
+		}
+		return res
 	}
-	// if (err("OTHR", res)) {  // =>>> I want err() to complain since "hey" is not "ENOENT" or "OTHER"
-	// return res
-	// }
-	const w = res  // w should be "normal return" | MyErr("OTHER")
-	return w
-	// if (err("ENOENT", res)) {
-	// 	const x = res  // x should be MyErr("ENOENT"), OK
-	// 	return x
-	// }
-	// if (err("OTHR", res)) {  // =>>> I want err() to complain since "hey" is not "ENOENT" or "OTHER"
-	// return res
-	// }
-	// const w = res  // w should be "normal return" | MyErr("OTHER")
-	// return w
+	const x = res
 }
 
-function err<X, T extends Extract<X, MyErr>['tag']>(x: X, tag: T): x is Extract<X, MyErr<T>> {
-	return x instanceof MyErr && x.tag === tag
+function err(x: unknown): x is Error
+function err<X, T extends Extract<X, RibuErr>['tag']>(x: X, tag?: T): x is Extract<X, RibuErr<T>>
+function err<X, T extends Extract<X, RibuErr>['tag']>(x: X, tag?: T): x is Extract<X, RibuErr<T>> {
+	if (tag === undefined) {
+		return x instanceof Error
+	}
+	return x instanceof RibuErr && x.tag === tag
 }
 
 
