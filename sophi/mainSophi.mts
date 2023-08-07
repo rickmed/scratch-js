@@ -11,7 +11,9 @@ go(function* main() {
 		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
 	}
 
-	const res = yield waitErr($locateFiles, $reporter)
+	// const res = yield waitErr($locateFiles, $reporter)
+	// better a helper here that runs them and it returns the result
+	// this way you don't forget to "await" for them.
 	console.log("sophi done. Goodbye")
 })
 

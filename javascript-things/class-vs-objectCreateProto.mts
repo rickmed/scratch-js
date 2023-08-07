@@ -11,9 +11,23 @@ type Obj = {
 	age: number
 }
 
-let obj: Obj & typeof proto = Object.create(proto)
-obj.age = 42
-obj.name = "john"
+let obj: Obj = {age: 42, name: "john"}
+Object.setPrototypeOf(obj, proto)
+const x = obj as Obj & typeof proto
+
+
+function _done() {
+	console.log("running")
+	return "epale"
+}
+
+// add a getter
+Object.defineProperty(obj, "_done", {
+	get: _done
+});
+
+console.log(obj._done)
+
 
 
 

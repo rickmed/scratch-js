@@ -92,7 +92,7 @@ export type Res<Args extends any[]> =
 
 type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
-function* toGen<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
+function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
 	function cb(err, result) {
 		// resume runningPrc
@@ -106,7 +106,7 @@ function* toGen<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyG
 }
 
 function* main() {
-	const res = yield* toGen(readFile, "foo.txt", { encoding: "utf8" })
+	const res = yield* cbToProcess(readFile, "foo.txt", { encoding: "utf8" })
 }
 
 

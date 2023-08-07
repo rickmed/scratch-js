@@ -136,20 +136,29 @@ let yielded
 
 /* +++ delegate generator    ++++++++++++++++++++++++++++++++++++++++++ */
 
-function* sub() {
-	yield 1
-	yield 2
-	return 3
-}
+// function* sub() {
+// 	yield 1
+// 	yield 2
+// 	return 3
+// }
 
-function* main() {
-	const res = yield* sub()
-	console.log({res})
-	return "MAIN DONE"
-}
+// function* main() {
+// 	const res = yield* sub()
+// 	console.log({res})
+// 	return "MAIN DONE"
+// }
 
-const gen = main()
-yielded = gen.next()
-console.log(yielded)
-yielded = gen.return("THIS")  // return "MAIN DONE" never executes
-console.log(yielded)
+// const gen = main()
+// yielded = gen.next()
+// console.log(yielded)
+// yielded = gen.return("THIS")  // return "MAIN DONE" never executes
+// console.log(yielded)
+
+
+/* +++ where are method prototypes++++++++++++++++++++++++++++++++++++++++++ */
+// const Ks = Object.getOwnPropertyNames
+
+// function* fn() {}
+// const gen = fn()
+// console.log(Ks(gen.__proto__))  // []
+// console.log(Ks(gen.__proto__.__proto__))  // ['constructor', 'next', 'return', 'throw']

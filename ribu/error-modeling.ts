@@ -1,56 +1,100 @@
-class RibuErr<Tag extends string = string> extends Error {
-	constructor(readonly tag: Tag) {
-		super()
-	}
+const RibuE = Symbol("RibuExc")
+
+export const UNKNOWN = "Unknown"
+
+export function E<Tag extends string>(tag: Tag, cause: Error): E<Tag> {
+	return { tag, cause, [RibuE]: true as const}
 }
 
-function Err<T extends string>(tag: T): RibuErr<T> {
-	return new RibuErr(tag)
+export function EUnknown<Tag extends string>(tag: Tag, cause: Error): E<Tag> {
+	return { tag, cause, [RibuE]: true as const}
 }
 
-function fn(x: number) {
-	if (x % 3 === 0) {
-		return "normal return"
-	}
-	if (x % 2 === 0) {
-		return Err("ENOENT")
-	}
-	return Err("OTHER")
+export function EPrcCancelled(): ExcProcessCancelled {
+	return { tag: "ProcessCancelled", [RibuE]: true }
 }
 
-function main() {
-	const res = fn(1)
-	if (err(res)) {
-		if (res.tag === "ENOENT") {
-			return res
-		}
-		return res
-	}
-	const x = res
-}
-
-function err(x: unknown): x is Error
-function err<X, T extends Extract<X, RibuErr>['tag']>(x: X, tag?: T): x is Extract<X, RibuErr<T>>
-function err<X, T extends Extract<X, RibuErr>['tag']>(x: X, tag?: T): x is Extract<X, RibuErr<T>> {
+export function exc<X>(x: X): x is Extract<X, EBase>
+export function exc<X, T extends Extract<X, EBase>["tag"]>(x: X, tag?: T): x is Extract<X, EBase<T>>
+export function exc<X, T extends Extract<X, EBase>["tag"]>(x: X, tag?: T): x is Extract<X, EBase<T>> {
 	if (tag === undefined) {
 		return x instanceof Error
 	}
-	return x instanceof RibuErr && x.tag === tag
+	return isRibuE(x) && x.tag === tag
+}
+
+export function excNot<X, T extends Extract<X, E>["tag"]>(x: X, tag: T): x is Extract<X, E> & Exclude<X, E<T>> {
+	return isRibuE(x) && x.tag !== tag
+}
+
+function isRibuE(x: unknown): x is E {
+	return typeof x === "object" && x !== null && RibuE in x && "tag" in x
+}
+
+type EBase<Tag extends string = string> = {
+	readonly [RibuE]: true
+	readonly tag: Tag
+}
+
+export type E<Tag extends string = string> = EBase<Tag> & {
+	readonly cause: Error
+}
+
+export type ExcProcessCancelled = EBase<"ProcessCancelled">
+
+
+/*
+function readFile(x: string) {
+	if (x === "one") {
+		return E("ENOENT", Error())
+	}
+	if (x === "two") {
+		return E("PERM_ERR", Error())
+	}
+	if (x === "3") {
+		return E("Unknown", Error())
+	}
+	return "file2" as string
+}
+
+function recover(x: string) {
+	if (x === "one") {
+		return E("SOME_ERR", Error())
+	}
+	return "file" as string
+}
+
+function uploadFile(x: string) {
+	if (x === "one") {
+		return E("TIMEOUT", Error())
+	}
+	if (x === "two") {
+		return E("NOPE", Error())
+	}
+	return true as boolean
 }
 
 
-// type ErrorTag =
-// 	| "ENOENT"
-// 	| "OTHER"
+function readFileWithErrHandling(filePath: string) {
+	let res = readFile(filePath)
 
-// class MyErr<Tag extends ErrorTag> extends Error {
-// 	tag: Tag
-// 	constructor(tag: Tag) {
-// 		super()
-// 		this.tag = tag
-// 	}
-// }
+	// if (err(res)) {
+	// 	if (err(res, "ENOENT")) {
+	// 		const res2 = recover(filePath)
+	// 		if (err(res2)) return res2
+	// 		res = res2
+	// 	}
+	// 	else return res
+	// }
 
-// function err<Tag extends ErrorTag>(tag: Tag, x: unknown): x is MyErr<Tag> {
-// 	return x instanceof MyErr && x.tag === tag
-// }
+	if (excNot(res, "ENOENT")) return res
+
+	if (exc(res)) {
+		const res2 = recover(filePath)
+		if (exc(res2)) return res2
+		res = res2
+	}
+
+	return res
+}
+ */
