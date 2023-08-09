@@ -136,21 +136,25 @@ let yielded
 
 /* +++ delegate generator    ++++++++++++++++++++++++++++++++++++++++++ */
 
-// function* sub() {
-// 	yield 1
-// 	yield 2
-// 	return 3
-// }
+function* sub() {
+	yield "sub 1"
+	yield "sub 2"
+	return "sub 3"
+}
 
-// function* main() {
-// 	const res = yield* sub()
-// 	console.log({res})
-// 	return "MAIN DONE"
-// }
+function* main() {
+	const res = yield* sub()
+	console.log({res})
+	return "MAIN DONE"
+}
 
-// const gen = main()
-// yielded = gen.next()
-// console.log(yielded)
+const gen = main()
+yielded = gen.next()
+console.log(yielded)
+yielded = gen.next()
+console.log(yielded)
+yielded = gen.next()
+console.log(yielded)
 // yielded = gen.return("THIS")  // return "MAIN DONE" never executes
 // console.log(yielded)
 

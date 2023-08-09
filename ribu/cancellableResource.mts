@@ -94,8 +94,16 @@ type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
+
 	function cb(err, result) {
-		// resume runningPrc
+		if (err) {
+			if (err.code === "ENOENT") {
+				prc.resume(E("NotFound", err))
+			}
+			if (err.code === "ENOENT") {
+				prc.resume(E("NotFound", err))
+			}
+		}
 	}
 
 	args.push(cb)

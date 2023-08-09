@@ -42,7 +42,7 @@ function isRibuE(x: unknown): x is E {
 
 /* Usage Example */
 
-function readFile(x: string) {
+function* readFile(x: string) {
 	if (x === "one") {
 		return E("NotFound", Error())
 	}
@@ -73,19 +73,14 @@ function uploadFile(x: string) {
 }
 
 
-function readFileWithErrHandling(filePath: string) {
-	let res = readFile(filePath)  // .unwrap?
-		.if("NotFound", recoverOp, filePath)
+function* readFileWithErrHandling(filePath: string) {
+	let res = yield* readFile(filePath)  // .done. | .unwrap() | etc
+		// .if("NotFound", recoverOp, filePath)
 
-	if (e(res)) return res
-
-
-
-
-	if (e(res)) {
-		res = res.on("NotFound", recoverOp, filePath)
-		if (e(res)) return res
-	}
+	// if (e(res)) {
+	// 	res = res.on("NotFound", recoverOp, filePath)
+	// 	if (e(res)) return res
+	// }
 
 
 	// if (notTag(res, "NotFound")) return res; if (e(res)) {

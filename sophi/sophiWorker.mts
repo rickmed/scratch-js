@@ -1,18 +1,19 @@
 import { go, Go, Ch, waitAll, cancel, DONE } from "ribu"
+import { E, e} from "../ribu/error-modeling"
 
 /*
-	Fix this whole file bc onlyUsed_Ch should be notified to sophiMain.js
+	Fix this whole file bc onlyUsed_Ch should be notified to mainSophi.ts
 	otherwise, file processing in other workers won't be cancelled
 */
 
-function* worker($upstream, $reporter) {
+function* worker($locateFiles, $reporter) {
 	const onlyUsedCh = Ch()
 	const resumeCh = Ch()
 	let loadFileProcs: unknown[] = []
 
 	go(function* handleFilePath() {
 		while (true) {
-			const filePath = yield $upstream.filePathS.rec
+			const filePath = yield $locateFiles.filePathS.rec
 			if (filePath === DONE) {
 				// I know it's
 			}
@@ -26,13 +27,13 @@ function* worker($upstream, $reporter) {
 
 		/* cancel the rest of workers (and $upstream from sending more data) */
 		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-		yield* cancel(loadFileProcs, $upstream)
+		yield cancel(loadFileProcs, $locateFiles)
 
-		go(flushQueue($upstream.filePathS))  // flush chans is almost always unnecessary
+		go(flushQueue($locateFiles.filePathS))  // flush chans is almost always unnecessary
 		yield resumeCh.put()  // resume only one worker
 	})
 
-	// here I need to wait for all children to finish.
+	// here I need to wait for all children to finish, respond to errors, etc.
 	const res = yield waitAll
 }
 
