@@ -136,30 +136,50 @@ let yielded
 
 /* +++ delegate generator    ++++++++++++++++++++++++++++++++++++++++++ */
 
-function* sub() {
-	yield "sub 1"
-	yield "sub 2"
-	return "sub 3"
-}
+// function* sub() {
+// 	yield "sub 1"
+// 	yield "sub 2"
+// 	return "sub 3"
+// }
 
-function* main() {
-	const res = yield* sub()
-	console.log({res})
-	return "MAIN DONE"
-}
+// function* main() {
+// 	const res = yield* sub()
+// 	console.log({res})
+// 	return "MAIN DONE"
+// }
 
-const gen = main()
-yielded = gen.next()
-console.log(yielded)
-yielded = gen.next()
-console.log(yielded)
-yielded = gen.next()
-console.log(yielded)
+// const gen = main()
+// yielded = gen.next()
+// console.log(yielded)
+// yielded = gen.next()
+// console.log(yielded)
+// yielded = gen.next()
+// console.log(yielded)
 // yielded = gen.return("THIS")  // return "MAIN DONE" never executes
 // console.log(yielded)
 
 
-/* +++ where are method prototypes++++++++++++++++++++++++++++++++++++++++++ */
+/* +++  micro-benchmark vs reg fn +++++++++++++++++++++++++++++++++++++++++++ */
+// genFn() ~fast fn()
+// genFn().next() is ~50% slower than fn()
+
+// function* genFn() {
+// 	return "yo"
+// }
+// let now = performance.now()
+// genFn().next()
+// console.log(performance.now() - now)
+
+// function regFn() {
+// 	return "hi"
+// }
+// now = performance.now()
+// regFn()
+// console.log(performance.now() - now)
+
+
+/* +++  where are method prototypes  ++++++++++++++++++++++++++++++++++++++++ */
+
 // const Ks = Object.getOwnPropertyNames
 
 // function* fn() {}

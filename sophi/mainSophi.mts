@@ -1,5 +1,5 @@
 import { go, chBuff, waitErr, workerGo, readdir, DONE, onCancel } from "ribu"
-
+import {cpus} from "node:os"
 
 go(function* main() {
 	const sophiConfig = {}
@@ -7,13 +7,10 @@ go(function* main() {
 	const $locateFiles = locateFiles(sophiConfig)
 	const $reporter = go(reporter)
 
-	for (const workerId of range(cpus().length)) {
-		workerGo("./sophiWorker.mjs", $locateFiles, $reporter, workerId)
-	}
+	const workers = cpus()
+		.map(() => workerGo("./sophiWorker.mjs", $locateFiles, $reporter))
 
-	// const res = yield waitErr($locateFiles, $reporter)
-	// better a helper here that runs them and it returns the result
-	// this way you don't forget to "await" for them.
+	const res = yield waitErr($locateFiles, $reporter, ...workers)
 	console.log("sophi done. Goodbye")
 })
 
