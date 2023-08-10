@@ -186,3 +186,22 @@ let yielded
 // const gen = fn()
 // console.log(Ks(gen.__proto__))  // []
 // console.log(Ks(gen.__proto__.__proto__))  // ['constructor', 'next', 'return', 'throw']
+
+
+/* +++  Throwing in genFn  ++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+// function* fn() {
+// 	try {
+// 		yield 1
+// 		hi
+// 	} catch (error) {
+// 		// error is swallowed
+// 	}
+// }
+
+// const gen = fn()
+// let y
+// y = gen.next()
+// console.log(y)  // { value: 1, done: false }
+// y = gen.next()
+// console.log(y)

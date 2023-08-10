@@ -9,42 +9,60 @@ import { E, e} from "../ribu/error-modeling"
 function* worker($locateFiles, $reporter) {
 	const onlyUsedCh = Ch()
 	const resumeCh = Ch()
-	let loadFileProcs: unknown[] = []
+	let $loadFileS: Array<unknown> = []
 
-	const child2 = go(function* handleFilePath() {
+	const handleFilePath = go(function* handleFilePath() {
+
+		// this guy "should" handle if loadFile cancellation fails.
+			// bc it's its owner (it launched it)
+
 		while (true) {
 			const filePath = yield $locateFiles.filePathS.rec
 			if (filePath === DONE) {
 				// I know it's
 			}
-			const proc = go(processTestFile, filePath, onlyUsedCh)
-			loadFileProcs.push(proc)
+
+			// this guy probably shouldn't churn $loadFile prcS, but should create
+				// a fixed amount of workers.
+			const $loadFile = go(loadFile, filePath, onlyUsedCh, $reporter)
+			$loadFileS.push($loadFile)
 		}
 	})
 
-	const child1 = go(function* handleOnlyUsed() {
-		const proc = yield onlyUsedCh
+	const handleOnlyUsed = go(function* handleOnlyUsed() {
+		const prc = yield onlyUsedCh
 
 		/* cancel the rest of workers (and $upstream from sending more data) */
-		loadFileProcs.splice(loadFileProcs.indexOf(proc), 1)
-		yield cancel(loadFileProcs, $locateFiles)
+			// if $locateFiles cancel fails, it will be reported in main's waitErr
+				// there, parent can decide what to do.
+			// But is $loadFileS cancel fails, nobody is listening
+				// to its completion status.
+
+		// => let's see cancel returns any errs is better
+		yield cancel($locateFiles, ...pluck(prc, $loadFileS))
 
 		go(flushQueue($locateFiles.filePathS))  // flush chans is almost always unnecessary
 		yield resumeCh.put()  // resume only one worker
 	})
 
-	// here I need to wait for all children to finish, respond to errors, etc.
-	const res = yield waitErr(child1, child2)
+	const res = yield waitErr(handleFilePath, handleOnlyUsed)
+	if (e(res)) return res
+	// return "ok", undefined, whatever.
 }
 
 
-function* processTestFile(filePath, onlyUsedCh, resumeCh) {
+function* loadFile(filePath, onlyUsedCh, resumeCh, $reporter) {
 	const onlyUsed = yield fileSuite(filePath)
 	if (onlyUsed) {
 		const shouldResume = Ch()
 		yield onlyUsedCh.put(this)
 		yield resumeCh
 		// if I continue here it means I wasn't cancelled
+		const testsResult = processFile(filePath)
+		while (true) {
+			const testResult = yield* testsResult.rec
+			$reporter.send(testResult)
+		}
 	}
 }
 
@@ -59,6 +77,7 @@ async function flushQueue(filePathS) {
 
 export default worker
 
+
 // :: "OK" | Error
 // returns a Ch that resolves immediately if Err (and cancels), or "OK"
 // this is the default behavior if genFn finishes and still active children.
@@ -68,9 +87,13 @@ function* waitErr(...prcS: Prc) {
 
 	while (ch.notDone) {
 		const res: Ch<typeof ch> = yield ch.rec
-		if (e(res)) {
+		if (e(res) && res.tag !== "Cancelled") {
 			const failedPrc = ch.justDone
-			yield cancel(pluck(prcS, failedPrc))
+
+			// cancel can fail. Design cancel fail options:
+				// throws to parent, returns a value, throws to caller.
+			yield cancel(pluck(failedPrc, prcS))
+
 			// maybe need to cancel ch as well?
 			return Error()
 		}
@@ -83,7 +106,7 @@ function* waitErr(...prcS: Prc) {
 	*/
 }
 
-function pluck(x, xS) {
+function pluck<T>(x: T, xS: T[]) {
 	xS.splice(xS.indexOf(x), 1)
 	return xS
 }

@@ -10,7 +10,7 @@ go(function* main() {
 	const workers = cpus()
 		.map(() => workerGo("./sophiWorker.mjs", $locateFiles, $reporter))
 
-	const res = yield waitErr($locateFiles, $reporter, ...workers)
+	const res = yield* waitErr($locateFiles, $reporter, ...workers)
 	console.log("sophi done. Goodbye")
 })
 
