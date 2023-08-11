@@ -1,5 +1,6 @@
 import { go, Go, Ch, cancel, DONE, type Prc } from "ribu"
 import { E, e} from "../ribu/error-modeling"
+import { error } from "effect/Brand"
 
 /*
 	Fix this whole file bc onlyUsed_Ch should be notified to mainSophi.ts
@@ -32,13 +33,10 @@ function* worker($locateFiles, $reporter) {
 	const handleOnlyUsed = go(function* handleOnlyUsed() {
 		const prc = yield onlyUsedCh
 
-		/* cancel the rest of workers (and $upstream from sending more data) */
-			// if $locateFiles cancel fails, it will be reported in main's waitErr
-				// there, parent can decide what to do.
-			// But is $loadFileS cancel fails, nobody is listening
-				// to its completion status.
+// If cancel(...) fails, it throws, if user doesn't catch here, ribu will
+// terminate calling prc (handleOnlyUsed) with Esomething.
+// Since worker's waitErr cancels eveything at any Err, it will terminate with err.
 
-		// => let's see cancel returns any errs is better
 		yield cancel($locateFiles, ...pluck(prc, $loadFileS))
 
 		go(flushQueue($locateFiles.filePathS))  // flush chans is almost always unnecessary
@@ -78,29 +76,38 @@ async function flushQueue(filePathS) {
 export default worker
 
 
-// :: "OK" | Error
-// returns a Ch that resolves immediately if Err (and cancels), or "OK"
-// this is the default behavior if genFn finishes and still active children.
+/*
+	ok so ._done waiters should be resumed on the way BACK from recursive cancellling()
+	
+
+*/
+
+
+// :: Error | customizableData
+// if any prc fails, it returns immediatly with Err (and cancels the rest)
+	// this is the default behavior if genFn finishes and still active children.
 function* waitErr(...prcS: Prc) {
 
 	const ch = Ch.fanIn(...prcS)
 
 	while (ch.notDone) {
+
 		const res: Ch<typeof ch> = yield ch.rec
+
 		if (e(res) && res.tag !== "Cancelled") {
 			const failedPrc = ch.justDone
 
-			// cancel can fail. Design cancel fail options:
-				// throws to parent, returns a value, throws to caller.
+// if cancel throws, and I don't catch here, ribu will catch it and
+// prc (worker in this case) will finish with Eother (which is a nice default behavior)
 			yield cancel(pluck(failedPrc, prcS))
 
-			// maybe need to cancel ch as well?
+// @todo: maybe need to cancel ch as well? what happens if I don't?
+	//
 			return Error()
 		}
 	}
 
 	return "OK"
-
 	/* or collect results
 		return prcs.map(prc => prc.returnedVal)
 	*/

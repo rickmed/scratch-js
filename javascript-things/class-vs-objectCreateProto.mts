@@ -1,52 +1,46 @@
-// This is slightly faster than the class below
-// no Object.prototype methods though
-const proto = {
-	greet(this: Obj): string {
-		return this.name
-	}
+function greet(this: Obj1): string {
+	return this.name
 }
 
-type Obj = {
+type Obj1 = {
 	name: string
 	age: number
 }
-
-let obj: Obj = {age: 42, name: "john"}
-Object.setPrototypeOf(obj, proto)
-const x = obj as Obj & typeof proto
-
-
-function _done() {
-	console.log("running")
-	return "epale"
+const Proto1 = {
+	greet,
+	get getAge() {    let this_ = this as Obj1   // this is slightly annoying, but getters/setters are probably the exception
+		return this_.age
+	},
+	set setName(x: string) {
+		this.name = x
+	}
 }
 
-// add a getter
-Object.defineProperty(obj, "_done", {
-	get: _done
-});
-
-console.log(obj._done)
+let obj1: Obj1 = {age: 42, name: "john"}
+const x1 = Object.setPrototypeOf(obj1, Proto1) as Obj1 & typeof Proto1
 
 
+/* Semi composition */
 
-
-// class
-class ObjClass {
-	name: string
-	age: number
-	constructor(name: string, age: number) {
-	  this.name = name
-	  this.age = age
+class Obj2 {
+	constructor(
+		public name: string,
+		public age: number,
+		private __proto__: null = null
+	) {}
+}
+const methods = {
+	greet
+}
+class Proto2 extends Obj2 {
+	get getAge() {
+		return this.age
 	}
-	getName() {
-	  return this.name
+	set setName(x: string) {
+		this.name = x
 	}
-	getAge() {
-	  return this.age
-	}
- }
+}
 
- const objClass = new ObjClass("john", 42)
- objClass.getName()
- objClass.getAge()
+let obj = new Obj2("john", 42)
+const x2 = Object.setPrototypeOf(obj1, Object.assign(Proto2.prototype, methods)) as Proto2 & typeof methods
+console.log(x2.greet())
