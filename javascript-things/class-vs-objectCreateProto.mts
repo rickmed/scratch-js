@@ -23,22 +23,14 @@ interface User<V> extends Methods<V> {
 }
 
 
-let obj1 = {v: 58, name: "john"} as User<number>
+let obj1 = { v: 11, name: "john1" } as User<number>
 Object.setPrototypeOf(obj1, Methods.prototype)
-const ww = obj1.method1()
+const ob1a = obj1.method1()
 
-const str = fn1(obj1)
-
-
+const obj1b = fn1(obj1)
 
 
 
-// const x  = obj1
-// type W<Type> = Type extends Obj2<infer X> ? X : never
-// const x1 = Object.setPrototypeOf(obj1, Proto1) as W<typeof obj> & typeof Proto1
-
-// const z = x1.greet()
-// console.log(z)
 
 
 
@@ -52,7 +44,7 @@ class Ks2<V> {
 		public v: V,
 		public name: string,
 		// private __proto__: null = null
-	) {}
+	) { }
 }
 
 
@@ -72,21 +64,23 @@ class Obj2<V> extends Ks2<V> {
 	}
 }
 
+// apply mixin
+Object.getOwnPropertyNames(Methods.prototype).forEach((name) => {
+	Object.defineProperty(
+		Obj2.prototype,
+		name,
+		Object.getOwnPropertyDescriptor(Methods.prototype, name) ||
+		Object.create(null)
+	);
+});
 
-// interface Obj2<V> extends Methods<V> {}
+interface Obj2<V> extends Methods<V> { }
 
-// let obj = new Obj2(42, "john")
+let obj2 = new Obj2(22, "john2")
 
-// Object.assign(Object.getPrototypeOf(obj), Methods.prototype)
-// console.log(Object.getOwnPropertyNames(obj.__proto__))
+const obj2a = obj2.method1()
 
-// console.log(Methods.prototype.propertyIsEnumerable("method1"))
-
-// console.log(Object.getOwnPropertyNames(Methods.prototype))
-
-
-// const x = obj.method1()
-// console.log(x)
+const obj2b = fn1(obj1)
 
 
 
