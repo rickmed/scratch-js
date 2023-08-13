@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+     "strict": true,
+     "moduleResolution": "Node16",
+     "target": "ES2022",
+    //  "checkJs": true,
+     "skipDefaultLibCheck": true,
+     "sourceMap": true,
+     "strictPropertyInitialization": true,
+     "noUncheckedIndexedAccess": true
+  },
+}

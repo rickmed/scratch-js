@@ -1,11 +1,22 @@
-const proto = {
-	get greet(): string {
-		return this.name
-	}
+function* fn1(x: string) {
+	return 5
 }
 
-let obj = {age: 42, name: "john"}
+function fn2() {
+	return 5
+}
 
-const newObj = Object.create(proto, obj)
+function* hi() {
+	const res = yield* fn1(5)
+	console.log(res)
+}
 
-console.log(newObj)
+hi()
+
+function int(gen) {
+
+	for (;;) {
+		const {done, value} = gen.next()
+		if (done) return value
+	}
+}

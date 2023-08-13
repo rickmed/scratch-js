@@ -92,10 +92,10 @@ export type Res<Args extends any[]> =
 
 type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
+
 function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
-
-	function cb(err, result) {
+	function cb(err, data) {
 		if (err) {
 			if (err.code === "ENOENT") {
 				prc.resume(E("NotFound", err))
@@ -104,6 +104,7 @@ function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>
 				prc.resume(E("NotFound", err))
 			}
 		}
+		prc.resume(data)
 	}
 
 	args.push(cb)

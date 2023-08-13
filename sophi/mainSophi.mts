@@ -1,4 +1,4 @@
-import { go, chBuff, waitErr, workerGo, readdir, DONE, onCancel } from "ribu"
+import { go, chBuff, waitErr, workerGo, readdir, DONE, onCancel, e } from "ribu"
 import {cpus} from "node:os"
 
 go(function* main() {
@@ -22,12 +22,20 @@ function locateFiles(sophiConfig) {
 
 	return go(function* locateFiles() {
 
+		onCancel(function* () { yield* filePathS.put(DONE) })
+
 		for (const dir of sophiConfig.folders) {
 			go(readDir(dir))
 		}
 
 		function* readDir(dirPath) {
 			const entries = yield* readdir(dirPath, {withFileTypes: true})
+
+			if (e(entries)) {
+				// ?? maybe here would be nice to throw.
+				// which will fail locateFiles and be caught handled by main.
+			}
+
 			// entries can be an error, maybe readdir can return a ch<file | err>
 			for (const entry of entries) {
 				if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
@@ -38,10 +46,6 @@ function locateFiles(sophiConfig) {
 				}
 			}
 		}
-
-		onCancel(function* () {
-			yield* filePathS.put(DONE)
-		})
 
 	}).ports({filePathS})
 }

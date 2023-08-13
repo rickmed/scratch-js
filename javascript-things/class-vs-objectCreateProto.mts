@@ -1,46 +1,135 @@
-function greet(this: Obj1): string {
-	return this.name
+// this is what we want to comply to
+interface Comply {
+	method1(): string
 }
 
-type Obj1 = {
-	name: string
-	age: number
+function fn1(x: Comply) {
+	return x.method1()
 }
-const Proto1 = {
-	greet,
-	get getAge() {    let this_ = this as Obj1   // this is slightly annoying, but getters/setters are probably the exception
-		return this_.age
-	},
-	set setName(x: string) {
-		this.name = x
+
+/* Methods mixed at prototype work with both Objects and Classes  */
+
+class Methods<V> {
+	method1<V>(this: User<V>) {
+		return this.v
 	}
 }
 
-let obj1: Obj1 = {age: 42, name: "john"}
-const x1 = Object.setPrototypeOf(obj1, Proto1) as Obj1 & typeof Proto1
+/* Mixins with POJOs */
+
+interface User<V> extends Methods<V> {
+	v: V
+	name: string
+}
+
+
+let obj1 = {v: 58, name: "john"} as User<number>
+Object.setPrototypeOf(obj1, Methods.prototype)
+const ww = obj1.method1()
+
+const str = fn1(obj1)
+
+
+
+
+
+// const x  = obj1
+// type W<Type> = Type extends Obj2<infer X> ? X : never
+// const x1 = Object.setPrototypeOf(obj1, Proto1) as W<typeof obj> & typeof Proto1
+
+// const z = x1.greet()
+// console.log(z)
+
+
+
+
 
 
 /* Semi composition */
 
-class Obj2 {
+class Ks2<V> {
 	constructor(
+		public v: V,
 		public name: string,
-		public age: number,
-		private __proto__: null = null
+		// private __proto__: null = null
 	) {}
 }
-const methods = {
-	greet
-}
-class Proto2 extends Obj2 {
-	get getAge() {
-		return this.age
+
+
+
+// class GetAge2<T> {
+// 	getV(this: Ks2<T>) {
+// 		return this.v
+// 	}
+// }
+
+class Obj2<V> extends Ks2<V> {
+	get getVV() {
+		return this.v
 	}
-	set setName(x: string) {
-		this.name = x
+	set setV(x: V) {
+		this.v = x
 	}
 }
 
-let obj = new Obj2("john", 42)
-const x2 = Object.setPrototypeOf(obj1, Object.assign(Proto2.prototype, methods)) as Proto2 & typeof methods
-console.log(x2.greet())
+
+// interface Obj2<V> extends Methods<V> {}
+
+// let obj = new Obj2(42, "john")
+
+// Object.assign(Object.getPrototypeOf(obj), Methods.prototype)
+// console.log(Object.getOwnPropertyNames(obj.__proto__))
+
+// console.log(Methods.prototype.propertyIsEnumerable("method1"))
+
+// console.log(Object.getOwnPropertyNames(Methods.prototype))
+
+
+// const x = obj.method1()
+// console.log(x)
+
+
+
+/* Notes
+	* I want to mix two classes really, where the 3rd class has both Ks and Ms
+*/
+
+
+
+/* Interaces and abstract classes */
+
+// abstract class A {
+// 	abstract f1(): string
+// 	f2() {
+// 		return "dsad"
+// 	}
+// }
+
+// interface A1 {
+// 	greet(): number
+// }
+
+// interface A2 {
+// 	greet2(): string
+// }
+
+// class B {
+// 	f1() {
+// 		return "dasd"
+// 	}
+// }
+
+// class C extends A {
+// 	f1() {
+// 		return "43"
+// 	}
+// }
+
+// function g(x: A) {
+// 	return x.f2()
+// }
+
+
+// const b1 = new B()
+
+// g(b1)
