@@ -7,13 +7,13 @@ function fn1(x: Comply) {
 	return x.method1()
 }
 
-/* Methods mixed at prototype work with both Objects and Classes  */
-
+// methods of Methods will be put in obj's prototypes (could do +1 classes)
 class Methods<V> {
 	method1<V>(this: User<V>) {
 		return this.v
 	}
 }
+
 
 /* Mixins with POJOs */
 
@@ -30,14 +30,7 @@ const ob1a = obj1.method1()
 const obj1b = fn1(obj1)
 
 
-
-
-
-
-
-
-
-/* Semi composition */
+/* Mixins with classes */
 
 class Ks2<V> {
 	constructor(
@@ -47,14 +40,7 @@ class Ks2<V> {
 	) { }
 }
 
-
-
-// class GetAge2<T> {
-// 	getV(this: Ks2<T>) {
-// 		return this.v
-// 	}
-// }
-
+// including getters and setters
 class Obj2<V> extends Ks2<V> {
 	get getVV() {
 		return this.v
