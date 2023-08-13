@@ -7,15 +7,21 @@ function fn1(x: Comply) {
 	return x.method1()
 }
 
+/* Notes
+	* What I'd really need it to mix two classes where the 3rd class has all Ks and Ms
+*/
+
 // methods of Methods will be put in obj's prototypes (could do +1 classes)
 class Methods<V> {
-	method1<V>(this: User<V>) {
+	method1(this: User<V>) {
 		return this.v
 	}
 }
 
 
-/* Mixins with POJOs */
+/*****   Mixins with POJOs   *****/
+// Problem: properties are not private.
+// Trade-off: either public Ks or copy methods (Ks in clouse)
 
 interface User<V> extends Methods<V> {
 	v: V
@@ -25,12 +31,13 @@ interface User<V> extends Methods<V> {
 
 let obj1 = { v: 11, name: "john1" } as User<number>
 Object.setPrototypeOf(obj1, Methods.prototype)
-const ob1a = obj1.method1()
 
+
+const obj1a = obj1.method1()
 const obj1b = fn1(obj1)
 
 
-/* Mixins with classes */
+/*****   Mixins with classes   *****/
 
 class Ks2<V> {
 	constructor(
@@ -67,49 +74,3 @@ let obj2 = new Obj2(22, "john2")
 const obj2a = obj2.method1()
 
 const obj2b = fn1(obj1)
-
-
-
-/* Notes
-	* I want to mix two classes really, where the 3rd class has both Ks and Ms
-*/
-
-
-
-/* Interaces and abstract classes */
-
-// abstract class A {
-// 	abstract f1(): string
-// 	f2() {
-// 		return "dsad"
-// 	}
-// }
-
-// interface A1 {
-// 	greet(): number
-// }
-
-// interface A2 {
-// 	greet2(): string
-// }
-
-// class B {
-// 	f1() {
-// 		return "dasd"
-// 	}
-// }
-
-// class C extends A {
-// 	f1() {
-// 		return "43"
-// 	}
-// }
-
-// function g(x: A) {
-// 	return x.f2()
-// }
-
-
-// const b1 = new B()
-
-// g(b1)

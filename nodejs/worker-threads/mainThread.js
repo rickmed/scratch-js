@@ -2,7 +2,6 @@ import { Worker } from "node:worker_threads"
 
 const worker = new Worker('./nodejs/worker-threads/worker1.js')
 
-
 // odd messages are worker -> parent time.
 let msgs = []
 
