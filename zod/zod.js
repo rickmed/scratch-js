@@ -4,7 +4,7 @@ const Schema = z.object({
 	name: z.literal("rick")
 }).strict()
 
-console.log(Schema.shape.name)
+console.log(Schema)
 
 const res = Schema.safeParse({ name: "rick", oy: 1 })
 

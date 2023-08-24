@@ -1,25 +1,35 @@
-import { go, ch, onCancel, Cancellable } from "ribu"
+import { go, Ch, onCancel, Cancellable, BroadcastCh } from "ribu"
 import { readdir, readFile as readFileProm } from "node:fs/promises"
 import {readFile} from "node:fs"
 import { provideContext } from "effect/Schedule"
 import { type } from "effect/Match"
 
-/* Maybe I don't need to wrap in go() the io leaves, ie, do it manually with channels.
-what go() gives me()
-	1) if parent is cancelled, child is auto-cancelled.
+/* Do I need to wrap the io leaves in go() or just yield* ?
+
+	1) can't cancel delegated gen
+
+	2) Don't have stack trace with genName and args on delegated gen
 
 
-	2) Maybe nice stack traces (with genFn args) when fatal error
+I think delegating directly to a generator is a sequential thing
+	ie, If I want to
 
-
-	cancel() routes to .done (ie, ErrCancelled or some error inside cancellation)
 */
 
 
-class Enoent extends Error { }
-class Ent extends Error { }
-
 // use function* directly and construct channels and return prc style api manually.
+/**
+ * Do I need to wrap this in a prc? What it provides:
+ *	I could implement onCancel = [], so onCancel() could work here. Is it worth it?
+
+ */
+
+/*
+
+I could could myReadFile as is, but if a want to launch 2 in parallel, I would
+need to wrap them in additional prcS. TBD
+*/
+
 function* myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args) {
 
 	const controller = new AbortController()
@@ -31,14 +41,19 @@ function* myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args
 		const prom = readFileProm(...args)
 		const file: Awaited<typeof prom> = yield prom
 
-		// need to implement return vals to use Prc.done and not create another ch here internally
+		// need to implement return vals to use Prc.done and not create another Ch here internally
 		return file
 	}
-	catch (e) {
+	catch (err) {
+		let e = err as NodeJS.ErrnoException
 		if (e.code === "ENOENT") {
-			return new Enoent()
+			// all nodejs Error.name === "Error"
+			// so I can reuse the object
+			e.name = "NotFound"
+			return e
 		} else {
-			return new Ent()
+			e.name = "PermissionDenied"
+			return e
 		}
 	}
 }
@@ -95,16 +110,21 @@ type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
+	// this whole thing needs to be wrapped in a prc.
+		// for onCancel() to work;
+		// and to return a channel to be composable (be ran concurrently etc)
+
 	function cb(err, data) {
 		if (err) {
 			if (err.code === "ENOENT") {
-				prc.resume(E("NotFound", err))
+		// not sure if type-inferrence this will be possible
+				prc.resolve(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
-				prc.resume(E("NotFound", err))
+				prc.resolve(E("NotFound", err))
 			}
 		}
-		prc.resume(data)
+		prc.resolve(data)
 	}
 
 	args.push(cb)
@@ -159,7 +179,8 @@ type Fn<Args extends unknown[]> =
 
 
 
-/* WebSockets. What ribu adds:
+/*** WebSockets ***
+What ribu adds:
 	1) the ws service is cancelled greacefully/automatically when parent finishes (or manually if desired)
 		so the server/client can get a chance do to things on cancellation
 	2) Ribu style Error modeling
@@ -170,16 +191,9 @@ you can expose a sync .send() of the api returned by MyWebSocket
 function CancellableWebSocket(url) {
 	const ws = new WebSocket(url)
 
-	const wsClosed = ch()
-	const fromServer = ch()
-	const toServer = ch()
-
-	go(function* _cancel() {
-		while (true) {
-			const msg = yield* toServer.rec
-			ws.send(msg)
-		}
-	})
+	const wsClosed = Ch()
+	const fromServerCh = BroadcastCh()
+	const toServer = Ch()
 
 	const prc = go(function* _cancel() {
 		onCancel(ws.close)
@@ -192,8 +206,21 @@ function CancellableWebSocket(url) {
 		wsClosed.resumeReceivers()
 	})
 	ws.addEventListener("message", msg => {
-		fromServer.resumeReceivers(msg) // all waiters should be called with same msg
-	});
+
+		// Maybe need an internal data structure if server is faster
+			// hot, cold, etc...
+		fromServerCh.resumeReceivers(msg)  // all waitingPrcS are called with same msg
+
+	// existing receivers go their way with msg,
+	// then, presumably when new msg arrive from server, there will be new receivers
+		// these should NOT be resumed with the last message.
+	// Issue: what if there are no receivers when .resumeReceivers(msg) is called?
+		// when a new receiver comes should it be resumed with the cached value
+		// and then cached value be deleted so that the next resumers
+		// or should throw to force user to make sure receivers are there?
+		// this whole logic is cursed, neeed to rethink later
+
+});
 
 	ws.addEventListener("open", (event) => {
 		// ??

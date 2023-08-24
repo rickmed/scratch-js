@@ -9,10 +9,16 @@ const divide = (a: number, b: number): Effect.Effect<never, Error, number> =>
 
 // $ExpectType Effect<never, Error, string>
 const program = Effect.gen(function* (_) {
+	const eff_ = Effect.succeed("4")
+	console.log(Object.getOwnPropertyNames(eff_))
   const [a, b] = [10, 11]
-  const n1 = yield* _(divide(a, b))
+	const xx = _(divide(a, b))
+	console.log(Object.getOwnPropertyNames(xx.value))
+  const n1 = yield* xx
   const n2 = increment(n1)
   return `Result is: ${n2}`
 })
+
+
 
 console.log(Effect.runSync(program)) // Output: "Result is: 6"

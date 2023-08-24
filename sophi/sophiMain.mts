@@ -1,4 +1,4 @@
-import { go, chBuff, waitErr, workerGo, readdir, DONE, onCancel, e } from "ribu"
+import { go, chBuff, waitErr, workerGo, readdir, onCancel, e } from "ribu"
 import {cpus} from "node:os"
 
 go(function* main() {
@@ -10,8 +10,9 @@ go(function* main() {
 	const workers = cpus()
 		.map(() => workerGo("./sophiWorker.mjs", $locateFiles, $reporter))
 
-	const res = yield* waitErr($locateFiles, $reporter, ...workers)
-	console.log("sophi done. Goodbye")
+	// const res = yield* waitErr($locateFiles, $reporter, ...workers)
+	// console.log("sophi done. Goodbye")
+	return "done"
 })
 
 
@@ -22,7 +23,9 @@ function locateFiles(sophiConfig) {
 
 	return go(function* locateFiles() {
 
-		onCancel(function* () { yield* filePathS.put(DONE) })
+		onCancel(function* () {
+			yield* filePathS.putDone()   // just a wrapper of ch.put(DONE)
+		})
 
 		for (const dir of sophiConfig.folders) {
 			go(readDir(dir))

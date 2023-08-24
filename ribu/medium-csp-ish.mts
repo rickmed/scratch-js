@@ -153,7 +153,7 @@ start()
 const player = async (name, table) => {
 	while (true) {
 	  const ball = await take(table)
-	  
+	  pm
 	  ball.hits++
 	  console.log(`${name} ${ball.hits}`)
 	  await sleep(100)

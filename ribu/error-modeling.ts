@@ -1,93 +1,105 @@
-const RibuE = Symbol("RibuExc")
-export const UNKNOWN = "Unknown"
-
-type EBase<Tag extends string = string> = {
-	readonly [RibuE]: true
-	readonly tag: Tag
+import { readFile as readFileProm } from "node:fs/promises"
+type E<Name extends string = string> = NodeJS.ErrnoException & {
+	readonly name: Name
 }
 
-export type E<Tag extends string = string> = EBase<Tag> & {
-	readonly cause: Error
-}
-
-export type ExcProcessCancelled = EBase<"ProcessCancelled">
-
-export function E<Tag extends string>(tag: Tag, cause: Error): E<Tag> {
-	return { tag, cause, [RibuE]: true as const}
-}
-
-export function EUnknown<Tag extends string>(tag: Tag, cause: Error): E<Tag> {
-	return { tag, cause, [RibuE]: true as const}
-}
-
-export function EPrcCancelled(): ExcProcessCancelled {
-	return { tag: "ProcessCancelled", [RibuE]: true }
+export function E<Name extends string = string>(name: Name, ogErr: Error | NodeJS.ErrnoException): E<Name> {
+	ogErr.name = name
+	return ogErr as E<typeof name>
 }
 
 
-export function e(x: unknown): x is EBase {
-	return isRibuE(x)
-}
+const CANC_OK = "CancelledOK" as const
 
-export function notTag<X, T extends Extract<X, E>["tag"]>(x: X, tag: T): x is Extract<X, E> & Exclude<X, E<T>> {
-	return isRibuE(x) && x.tag !== tag
-}
-
-function isRibuE(x: unknown): x is E {
-	return typeof x === "object" && x !== null && RibuE in x && "tag" in x
+export function ECancOK() {
+	let newErr = Error()
+	newErr.name = CANC_OK
+	return newErr as E<typeof CANC_OK>
 }
 
 
+type InOnCancel = {
+	inBody?: Error,
+	children?: Array<InOnCancel>
+}
+
+export type EUncaught = E<"UncaughtThrow"> & {
+	data: {
+		inBody?: Error,
+		inOnCancel?: InOnCancel
+	}
+}
+
+
+export function err(x: unknown): x is E {
+	return x instanceof Error
+}
+
+
+export function errIsNot<X, T extends Extract<X, E>["name"]>(x: X, name: T): x is Extract<X, E> & Exclude<X, E<T>> {
+	return err(x) && x.name !== name
+}
 
 
 /* Usage Example */
 
 function* readFile(x: string) {
-	if (x === "one") {
-		return E("NotFound", Error())
+	try {
+		const prom = readFileProm("dsad", "utf-8")
+		const file: Awaited<typeof prom> = yield prom
+
+		// need to implement return vals to use Prc.done and not create another Ch here internally
+		return file
 	}
-	if (x === "two") {
-		return E("PERM_ERR", Error())
+	catch (err) {
+		let e = err as NodeJS.ErrnoException
+		if (e.code === "ENOENT") {
+			return E("NotFound", e)
+		}
+		return E("Other", e)
+		// else {
+		// }
+
+		// https://kentcdodds.com/blog/get-a-catch-block-error-message-with-typescript
 	}
-	if (x === "3") {
-		return E("Unknown", Error())
-	}
-	return "file2" as string
 }
 
 function recoverOp(x: string) {
 	if (x === "one") {
 		return E("SOME_ERR", Error())
 	}
-	return "file" as string
+	return "file" + "2"
 }
 
-function uploadFile(x: string) {
+function uploadFile(x: string): number | E<"Timeout" | "Nope"> {
 	if (x === "one") {
-		return E("TIMEOUT", Error())
+		return E("Timeout", Error())
 	}
 	if (x === "two") {
-		return E("NOPE", Error())
+		return E("Nope", Error())
 	}
-	return true as boolean
+	return 1 + 2
 }
-
 
 function* readFileWithErrHandling(filePath: string) {
 	let res = yield* readFile(filePath)  // .done. | .unwrap() | etc
-		// .if("NotFound", recoverOp, filePath)
+		// .ifExc("NotFound", recoverOp, filePath)
 
 	// if (e(res)) {
 	// 	res = res.on("NotFound", recoverOp, filePath)
 	// 	if (e(res)) return res
 	// }
 
+	if (errIsNot(res, "NotFound")) return res;
 
-	// if (notTag(res, "NotFound")) return res; if (e(res)) {
-	// 	const res2 = recoverOp(filePath)
-		// if (e(res2)) return res2
-	// 	res = res2
-	// }
+	if (err(res)) {
+		let x = res
+		const res2 = recoverOp(filePath)
+		if (err(res2)) return res2
+		res = res2
+	}
+
+	const y = res
 
 	return res
 }

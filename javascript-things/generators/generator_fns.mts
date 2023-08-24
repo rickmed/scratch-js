@@ -205,3 +205,19 @@ let yielded
 // console.log(y)  // { value: 1, done: false }
 // y = gen.next()
 // console.log(y)
+
+/* +++  Simple interpreter  +++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+// function go(genFn) {
+// 	const gen = genFn()
+
+// 	for (;;) {
+// 		const {done, value} = gen.next()
+// 		if (done) return value
+// 		setTimeout(() => {
+// 			console.log("awakening")
+// 			gen.next()
+// 		}, 1000)
+// 		return
+// 	}
+// }
