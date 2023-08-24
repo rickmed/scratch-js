@@ -42,6 +42,16 @@ function* happyEB(hostName: string, port: number, waitTime: number) {
 	}
 
 	return Error()  // all sockets failed
+	// there's a possibility that all inFlight are done but launchAttemps is
+		// still launching a new attempt
+	// so need to check something like if (launchAttempts.notDone)
+
+	/*
+	Implementation Alternative:
+		with events like trio/zio.
+			it sends an event "launch attempt" if current attempt failed or timeout
+			to another part of the algorithm with launches the attempt
+	*/
 }
 
 
