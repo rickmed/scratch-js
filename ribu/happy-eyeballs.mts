@@ -1,102 +1,66 @@
 import { sleep } from "effect/Effect"
 import dns from "node:dns/promises"
 import net from "node:net"
-import { NotFoundError } from "rxjs"
+import {Timeout, Monitor} from "ribu"
 import { err } from "./error-modeling.js"
 import { getOption } from "effect/Context"
 
-// launches a tryConnection
-// if the previous launched takes +250ms or fails, it launches another one
-// and so on...until one of the in-flight ReqS succedes
-// which cancels the rest and returns that result.
 
-
-// need to use any.  But you can add prc to any dynamically
+// Notes:
+	// If we were in mutithreaded environment, +1 socket could be done succesfully
+		// at the same time. So need to keep track and cancel the rest.
 
 function* happyEB(hostName: string, port: number, waitTime: number) {
 	const addrsS: string[] = yield dns.resolve4(hostName)
-	const inFlight = anyVal(go(connect, addrsS.shift()))
+	const inFlight = Monitor<Timeout | typeof connect>()
 
-	const launchAttempts = go(function* () {
-		while (addrsS.length) {
-			const attempt = go(connect, addrsS.shift())
-			const won = yield* anyPrc(timeout, attemptPrc).rec
-			if (won !== attempt || won.doneVal === Error) {
-				inFlight.add(attempt)
-			}
-			// here, this attempt is succesfull, but in the meantime, an inFlight
-			// attempt might be already be succesfull
-			// I think the best thing would be to somehow put this success into
-				// inFlight so that the for loop below can catch it.
-			inFlight.put(won.doneVal)  // doneVal is a socket
-			return
-		}
-	})
+	let timeout = Timeout.new(waitTime)
+	inFlight.go(timeout)
 
-	for (const ch of inFlight) {
-		const socket = yield* ch.rec
-		if (notErr(socket)) {
-			yield cancel(inFlight, launchAttempts)
-			return socket
+	while (inFlight.notDone) {
+		if (addrsS.length > 0) {
+			inFlight.go(connect(addrsS.shift()!))
 		}
+		const val = yield* inFlight.rec
+		if (err(val) || Timeout) {
+			yield inFlight.go(timeout.restart())
+			continue
+		}
+		// a connection succeeded
+		yield inFlight.cancel()
+		return val
 	}
 
-	return Error()  // all sockets failed
-	// there's a possibility that all inFlight are done but launchAttemps is
-		// still launching a new attempt
-	// so need to check something like if (launchAttempts.notDone)
-
-	/*
-	Implementation Alternative:
-		with events like trio/zio.
-			it sends an event "launch attempt" if current attempt failed or timeout
-			to another part of the algorithm with launches the attempt
-	*/
+	return Error("all connections failed")
 }
 
 
-function timeout(ms: number): Prc<void> {
-	return go(function* () {
-		yield sleep(ms)
+
+function connect(addrs: string) {
+	const socket = new net.Socket()
+	const prc = go_()
+
+	onCancel(socket.destroy)
+
+	socket.on("error", (e) => {
+		prc.resolve(e)
 	})
-}
-
-
-function* connect(socket: net.Socket) {
-	return socket instanceof Error ? Error() : true
-}
-
-
-
-
-function openTCPSocket()
-
-
-function timeout(ms: number): Prc<void> {
-	return go(function* () {
-		yield sleep(ms)
+	socket.on("ready", () => {
+		prc.resolve(socket)
 	})
+	socket.connect(443, addrs)
+	return prc
 }
 
 
-
-
-
-
-
-
-
-const addrsS = await dns.resolve4("google.com")
-
-// const socket = new net.Socket()
-
-// socket.on("error", (e) => {
-// 	console.log("ERRRORR:", e)
-// })
-
-// socket.on("connect", () => {
-// 	console.log("SUCCESS!")
-// })
-
-// const addrs = addrsS[0]!
-// socket.connect(443, addrs)
+function anyVal<P>() {
+	return {
+		get rec() {
+			return (function* () {return true})()
+		},
+		get notDone() {
+			return true
+		},
+		go(...x: unknown[]) {}
+	}
+}

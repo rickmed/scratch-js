@@ -6,7 +6,7 @@
     {
       "label": "tsx run current file",
       "type": "shell",
-      "command": "tsx ${file}",
+      "command": "clear; tsx ${file}",
       "problemMatcher": [],
     }
   ]

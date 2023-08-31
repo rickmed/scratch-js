@@ -9,11 +9,12 @@ const divide = (a: number, b: number): Effect.Effect<never, Error, number> =>
 
 // $ExpectType Effect<never, Error, string>
 const program = Effect.gen(function* (_) {
-	const eff_ = Effect.succeed("4")
-	console.log(Object.getOwnPropertyNames(eff_))
-  const [a, b] = [10, 11]
+	// const eff_ = Effect.succeed("4")
+	// console.log(Object.getOwnPropertyNames(eff_))
+  const [a, b] = [10, 3]
 	const xx = _(divide(a, b))
-	console.log(Object.getOwnPropertyNames(xx.value))
+	// console.log(Object.getOwnPropertyNames(xx[Symbol.iterator]()))
+	console.log(xx[Symbol.iterator]().self.value)
   const n1 = yield* xx
   const n2 = increment(n1)
   return `Result is: ${n2}`
@@ -22,3 +23,24 @@ const program = Effect.gen(function* (_) {
 
 
 console.log(Effect.runSync(program)) // Output: "Result is: 6"
+
+
+const prc = {
+	[Symbol.iterator]() {
+		return {
+			next() {
+				if (true) {
+					return {value: 78, done: false}
+				}
+				return {value: "dsad", done: true}
+			}
+		}
+	},
+	cancel() {
+		return 2
+	}
+}
+
+function* gen() {
+	const x = yield* prc
+}

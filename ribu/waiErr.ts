@@ -10,9 +10,9 @@ function* waitErr(...prcS: Prc) {
 
 		if (e(res) && res.tag !== "Cancelled") {
 
-	// If cancel(...) fails, it throws, if user doesn't catch here, ribu will
-	// terminate calling prc (worker in this case) and resolve it with Exc.
-		// which the parent should react to (and up the stack)
+			// If cancel(...) fails, it throws, if user doesn't catch here, ribu will
+			// terminate calling prc (worker in this case) and resolve it with Exc.
+			// which the parent should react to (and up the stack)
 
 			yield cancel(prcS)  // cancel is idempotent so no need to pull donePrcs
 			return Error()
@@ -59,3 +59,13 @@ function* waitErr4(...prcS: Prc) {
 	}
 	return prcS.map(prc => prc.doneVal)
 }
+
+
+
+/* Happy EyeBalls in pseudo-english:
+	launch attempt
+	if any of the previous in-flight attempts failed or a timeout fires:
+		launch another one
+	cancel everything when one attempt is succesful.
+
+*/

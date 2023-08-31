@@ -1,67 +1,67 @@
 import { go, Ch, onCancel, Cancellable, BroadcastCh } from "ribu"
 import { readdir, readFile as readFileProm } from "node:fs/promises"
-import {readFile} from "node:fs"
+import { readFile } from "node:fs"
 import { provideContext } from "effect/Schedule"
 import { type } from "effect/Match"
 
-/* Do I need to wrap the io leaves in go() or just yield* ?
+/* Why wrap io leaves in go() vs just yield*:
 
 	1) can't cancel delegated gen
+		- onCancel(() => {}) doesn't work bc if the process already has it set up (would overwrite)
 
-	2) Don't have stack trace with genName and args on delegated gen
+	2) Loses nice stack trace with genName and args on delegated gen
 
-
-I think delegating directly to a generator is a sequential thing
-	ie, If I want to
-
+	3) Can't compose, eg, if want to launch two in parallel.
 */
 
+function myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args)  {
+	return go(_myReadFile(...args))
 
-// use function* directly and construct channels and return prc style api manually.
-/**
- * Do I need to wrap this in a prc? What it provides:
- *	I could implement onCancel = [], so onCancel() could work here. Is it worth it?
+	function* _myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args) {
 
- */
+		const controller = new AbortController()
+		opts.signal = controller.signal
 
-/*
+		onCancel(() => controller.abort())  // throws if main calls onCancel()
 
-I could could myReadFile as is, but if a want to launch 2 in parallel, I would
-need to wrap them in additional prcS. TBD
-*/
+		try {
+			const prom = readFileProm(...args)
+			const file: Awaited<typeof prom> = yield prom
 
-function* myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args) {
-
-	const controller = new AbortController()
-	opts.signal = controller.signal
-
-	onCancel(() => controller.abort())  // throws if main calls onCancel()
-
-	try {
-		const prom = readFileProm(...args)
-		const file: Awaited<typeof prom> = yield prom
-
-		// need to implement return vals to use Prc.done and not create another Ch here internally
-		return file
-	}
-	catch (err) {
-		let e = err as NodeJS.ErrnoException
-		if (e.code === "ENOENT") {
-			// all nodejs Error.name === "Error"
-			// so I can reuse the object
-			e.name = "NotFound"
-			return e
-		} else {
-			e.name = "PermissionDenied"
-			return e
+			// need to implement return vals to use Prc.done and not create another Ch here internally
+			return file
+		}
+		catch (err) {
+			let e = err as NodeJS.ErrnoException
+			if (e.code === "ENOENT") {
+				// all nodejs Error.name === "Error"
+				// so I can reuse the object
+				e.name = "NotFound"
+				return e
+			} else {
+				e.name = "PermissionDenied"
+				return e
+			}
 		}
 	}
 }
 
+
+/* Avoid .rec */
 go(function* main() {
 	const result = yield* myReadFile("foo.txt", { encoding: "utf8" })
-})
+	const prc = myReadFile("foo.txt", { encoding: "utf8" })
+	const prc2 = myReadFile("foo.txt", { encoding: "utf8" })
+	let procs = [prc, prc2]
 
+// now myReadFile2 returns Gen<T>:
+// I'd need to pass those to anyVal for example
+	// I could extend the genObj with symbol fields so I recognize
+		// internally how to manage them.
+		// *could I still use prc.cancel() ?
+	// See ribu/process.mts Prc type for any other implementation issues
+
+})
 
 
 
@@ -111,13 +111,13 @@ type MyGen<Fn> = Res<OverloadArgs<Fn>>
 function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
 	// this whole thing needs to be wrapped in a prc.
-		// for onCancel() to work;
-		// and to return a channel to be composable (be ran concurrently etc)
+	// for onCancel() to work;
+
 
 	function cb(err, data) {
 		if (err) {
 			if (err.code === "ENOENT") {
-		// not sure if type-inferrence this will be possible
+				// not sure if type-inferrence this will be possible
 				prc.resolve(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
@@ -208,19 +208,19 @@ function CancellableWebSocket(url) {
 	ws.addEventListener("message", msg => {
 
 		// Maybe need an internal data structure if server is faster
-			// hot, cold, etc...
+		// hot, cold, etc...
 		fromServerCh.resumeReceivers(msg)  // all waitingPrcS are called with same msg
 
-	// existing receivers go their way with msg,
-	// then, presumably when new msg arrive from server, there will be new receivers
+		// existing receivers go their way with msg,
+		// then, presumably when new msg arrive from server, there will be new receivers
 		// these should NOT be resumed with the last message.
-	// Issue: what if there are no receivers when .resumeReceivers(msg) is called?
+		// Issue: what if there are no receivers when .resumeReceivers(msg) is called?
 		// when a new receiver comes should it be resumed with the cached value
 		// and then cached value be deleted so that the next resumers
 		// or should throw to force user to make sure receivers are there?
 		// this whole logic is cursed, neeed to rethink later
 
-});
+	});
 
 	ws.addEventListener("open", (event) => {
 		// ??

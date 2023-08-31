@@ -7,7 +7,7 @@
         "sourceMaps": true,
         "showAsyncStacks": true,
         "type": "node",
-        "runtimeArgs": ["--no-warnings", "--loader", "/usr/local/bin/tsx"],
+        "runtimeArgs": ["--no-warnings", "--loader", "tsx"],
         "request": "launch",
         "program": "${file}",
         "skipFiles": ["<node_internals>/**", "**/node_modules/**"],

@@ -33,7 +33,7 @@ function* worker($locateFiles, $reporter) {
 	const handleOnlyUsed = go(function* handleOnlyUsed() {
 		const prc = yield onlyUsedCh
 
-		// If cancel(...) fails, it throws, if user doesn't catch here, ribu will
+		// If cancel(...) fails ribu will
 		// terminate calling prc (handleOnlyUsed) with some Err.
 		// Since worker's waitErr cancels eveything at any Err, it will terminate with err.
 
