@@ -8,6 +8,6 @@
      "skipDefaultLibCheck": true,
      "sourceMap": true,
      "strictPropertyInitialization": true,
-     "noUncheckedIndexedAccess": true
+     "noUncheckedIndexedAccess": true,
   },
 }

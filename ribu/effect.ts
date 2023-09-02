@@ -14,33 +14,11 @@ const program = Effect.gen(function* (_) {
   const [a, b] = [10, 3]
 	const xx = _(divide(a, b))
 	// console.log(Object.getOwnPropertyNames(xx[Symbol.iterator]()))
-	console.log(xx[Symbol.iterator]().self.value)
+	// console.log(xx[Symbol.iterator]().self.value)
   const n1 = yield* xx
   const n2 = increment(n1)
   return `Result is: ${n2}`
 })
 
 
-
 console.log(Effect.runSync(program)) // Output: "Result is: 6"
-
-
-const prc = {
-	[Symbol.iterator]() {
-		return {
-			next() {
-				if (true) {
-					return {value: 78, done: false}
-				}
-				return {value: "dsad", done: true}
-			}
-		}
-	},
-	cancel() {
-		return 2
-	}
-}
-
-function* gen() {
-	const x = yield* prc
-}

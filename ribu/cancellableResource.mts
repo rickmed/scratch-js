@@ -54,14 +54,13 @@ go(function* main() {
 	const prc2 = myReadFile("foo.txt", { encoding: "utf8" })
 	let procs = [prc, prc2]
 
-// now myReadFile2 returns Gen<T>:
-// I'd need to pass those to anyVal for example
-	// I could extend the genObj with symbol fields so I recognize
-		// internally how to manage them.
-		// *could I still use prc.cancel() ?
-	// See ribu/process.mts Prc type for any other implementation issues
+// within theIterator.next(): I could check what op is being made
+	// and if it's a prc, return {done: true, value: prc.IOmsg}
+		// IOmsg is is set as the return val of prc (prc.status === DONE)
 
 })
+
+
 
 
 
@@ -108,30 +107,27 @@ export type Res<Args extends any[]> =
 type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 
-function* cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
+function cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
-	// this whole thing needs to be wrapped in a prc.
-	// for onCancel() to work;
-
+	const prc = Prc()
 
 	function cb(err, data) {
 		if (err) {
 			if (err.code === "ENOENT") {
 				// not sure if type-inferrence this will be possible
-				prc.resolve(E("NotFound", err))
+				prc.resume(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
-				prc.resolve(E("NotFound", err))
+				prc.resume(E("NotFound", err))
 			}
 		}
-		prc.resolve(data)
+		prc.resume(data)
 	}
 
 	args.push(cb)
 	cbBasedFn(...args)
 
-	const x = yield "PARK"
-	return x
+return prc
 }
 
 function* main() {

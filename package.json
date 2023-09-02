@@ -4,6 +4,7 @@
     "#mymod": "./import_modules/module1.js"
   },
   "dependencies": {
+    "@types/node": "^20.5.7",
     "effect": "^2.0.0-next.21",
     "expect": "^29.4.3",
     "js-csp": "^1.0.1",
@@ -14,6 +15,6 @@
     "zod": "^3.20.6"
   },
   "devDependencies": {
-    "typescript": "^5.1.5"
+    "typescript": "^5.2.2"
   }
 }

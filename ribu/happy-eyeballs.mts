@@ -1,33 +1,42 @@
 import { sleep } from "effect/Effect"
 import dns from "node:dns/promises"
 import net from "node:net"
-import {Timeout, Monitor} from "ribu"
+import {Timeout, any} from "ribu"
 import { err } from "./error-modeling.js"
 import { getOption } from "effect/Context"
+
+
+/* Happy EyeBalls in pseudo-english:
+	launch attempt
+	if any of the previous in-flight attempts failed or a timeout fires:
+		launch another one
+	cancel all in-flight when one attempt is succesful.
+*/
 
 
 // Notes:
 	// If we were in mutithreaded environment, +1 socket could be done succesfully
 		// at the same time. So need to keep track and cancel the rest.
+	// any ignores prcS that resolve with "Cancelled"
 
 function* happyEB(hostName: string, port: number, waitTime: number) {
 	const addrsS: string[] = yield dns.resolve4(hostName)
-	const inFlight = Monitor<Timeout | typeof connect>()
+	const inFlight = any<Timeout | typeof connect>()
 
-	let timeout = Timeout.new(waitTime)
+	let timeout = Timeout(waitTime)
 	inFlight.go(timeout)
 
-	while (inFlight.notDone) {
+	while (inFlight.count) {
 		if (addrsS.length > 0) {
 			inFlight.go(connect(addrsS.shift()!))
 		}
 		const val = yield* inFlight.rec
 		if (err(val) || Timeout) {
-			yield inFlight.go(timeout.restart())
+			yield* inFlight.go(timeout.restart())
 			continue
 		}
 		// a connection succeeded
-		yield inFlight.cancel()
+		yield* inFlight.cancel()
 		return val
 	}
 

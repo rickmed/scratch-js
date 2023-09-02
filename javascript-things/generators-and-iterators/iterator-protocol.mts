@@ -6,7 +6,7 @@ let i = 0
 
 const obj1 = {value: 78, done: false}
 
-const prc = {
+const iterator = {
 	[Symbol.iterator]() {
 		return {
 			next(msg) {
@@ -26,7 +26,10 @@ const prc = {
 function* gen() {
 	yield 21
 	console.log("2nd gen")
-	const x = yield* prc
+	// yield* calls iterator[Symbol.iterator]().next(undefined)
+		// if {done: false}, the obj is forwarded to gen.next() caller
+		// else ({done: true}), x is {value}, ie, the obj itself is ignored
+	const x = yield* iterator
 	console.log({x})
 }
 
