@@ -1,8 +1,8 @@
 import { sleep } from "effect/Effect"
 import dns from "node:dns/promises"
 import net from "node:net"
-import {Timeout, any} from "ribu"
-import { err } from "./error-modeling.js"
+import {Timeout, Group} from "ribu"
+import { err, E } from "./error-modeling.js"
 import { getOption } from "effect/Context"
 
 
@@ -21,18 +21,18 @@ import { getOption } from "effect/Context"
 
 function* happyEB(hostName: string, port: number, waitTime: number) {
 	const addrsS: string[] = yield dns.resolve4(hostName)
-	const inFlight = any<Timeout | typeof connect>()
+	const inFlight = Group<Timeout | typeof connect>()
 
 	let timeout = Timeout(waitTime)
-	inFlight.go(timeout)
+	inFlight.add(timeout)
 
 	while (inFlight.count) {
 		if (addrsS.length > 0) {
-			inFlight.go(connect(addrsS.shift()!))
+			inFlight.add(connect(addrsS.shift()!))
 		}
 		const val = yield* inFlight.rec
 		if (err(val) || Timeout) {
-			yield* inFlight.go(timeout.restart())
+			yield* inFlight.add(timeout.restart())
 			continue
 		}
 		// a connection succeeded
@@ -40,7 +40,7 @@ function* happyEB(hostName: string, port: number, waitTime: number) {
 		return val
 	}
 
-	return Error("all connections failed")
+	return Error("Connection")
 }
 
 
@@ -49,7 +49,7 @@ function connect(addrs: string) {
 	const socket = new net.Socket()
 	const prc = go_()
 
-	onCancel(socket.destroy)
+	onCancel(() => socket.destroy())
 
 	socket.on("error", (e) => {
 		prc.resolve(e)

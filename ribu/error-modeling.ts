@@ -1,9 +1,13 @@
 import { readFile as readFileProm } from "node:fs/promises"
-type E<Name extends string = string> = NodeJS.ErrnoException & {
+
+
+interface E<Name extends string = string> extends NodeJS.ErrnoException {
 	readonly name: Name
 }
 
-export function E<Name extends string = string>(name: Name, ogErr: Error | NodeJS.ErrnoException): E<Name> {
+const x: E<"One"> = {name: "One", message: ""}
+
+export function E<Name extends string = string>(name: Name, ogErr: Error): E<Name> {
 	ogErr.name = name
 	return ogErr as E<typeof name>
 }
@@ -40,21 +44,29 @@ export function errIsNot<X, T extends Extract<X, E>["name"]>(x: X, name: T): x i
 	return err(x) && x.name !== name
 }
 
+function errIs<X, T extends Extract<X, E>['name']>(x: X, name: T): x is Extract<X, E<T>> {
+	return err(x) && x.name === name
+}
+
+export function Err<Name extends string = string>(name: Name, ogErr: Error | NodeJS.ErrnoException) {
+	ogErr.name = name
+	return ogErr
+}
+
 
 /* Usage Example */
 
-function* readFile(x: string) {
+function readFile(x: string) {
 	try {
-		const prom = readFileProm("dsad", "utf-8")
-		const file: Awaited<typeof prom> = yield prom
+		// const file = await readFileProm("dsad", "utf-8")
+		// const file: Awaited<typeof prom> = yield prom
 
 		// need to implement return vals to use Prc.done and not create another Ch here internally
-		return file
+		return "dsd"
 	}
-	catch (err) {
-		let e = err as NodeJS.ErrnoException
+	catch (e) {
 		if (e.code === "ENOENT") {
-			return E("NotFound", e)
+			return E("NotFound", e as Error)
 		}
 		return E("Other", e)
 		// else {
@@ -71,31 +83,37 @@ function recoverOp(x: string) {
 	return "file" + "2"
 }
 
-function uploadFile(x: string): number | E<"Timeout" | "Nope"> {
+function uploadFile(x: string): string | E<"Timeout"> | E<"Nope"> {
 	if (x === "one") {
 		return E("Timeout", Error())
 	}
 	if (x === "two") {
 		return E("Nope", Error())
 	}
-	return 1 + 2
+	return "1 + 2"
 }
 
-function* readFileWithErrHandling(filePath: string) {
-	let res = yield* readFile(filePath)  // .done. | .unwrap() | etc
-		// .ifExc("NotFound", recoverOp, filePath)
+function readFileWithErrHandling(filePath: string) {
+	let res = uploadFile(filePath)
+		.iErr("NotFound").Go(recoverOp)  // passes in the result of readFile
 
 	// if (e(res)) {
 	// 	res = res.on("NotFound", recoverOp, filePath)
 	// 	if (e(res)) return res
 	// }
 
-	if (errIsNot(res, "NotFound")) return res;
+	if (errIsNot(res, "Nope")) {
+		let x = res
+		return res
+	}
+	// if (err(res)) {
+	// 	err.name === ""
+	// }
 
 	if (err(res)) {
 		let x = res
-		const res2 = recoverOp(filePath)
-		if (err(res2)) return res2
+		const res2 = uploadFile(filePath)
+		if (errIsNot(res2, "Nope")) return res2
 		res = res2
 	}
 
@@ -103,3 +121,37 @@ function* readFileWithErrHandling(filePath: string) {
 
 	return res
 }
+
+
+
+function* fn11(file: string) {
+	// async things need to be wrapped in prc anyways:
+		// fn111 will create/run prc.
+		// .ifErr will run immediately when fn111() returns (ie, an running prc)
+			// so needs to be implemented like a .then(),
+			// ie, need to add the continuation as subscriber to upstream and so on...
+		// same with .go()
+		// ok let's say go(rescoverOp) fails, what should happen?
+			// the runningPrc could be resolved by Err, but this won't be statically available
+			// would be like a throw.
+
+
+	return yield* readFile(file)  // returns prc (wraps prom/cb)
+		.ifErrIs("NotFound").go(readFile, "./default.txt")
+		// what happens if error is different from "NotFound"?
+			// this pipeline should return
+		// so the type of fn11 should be:
+			// errorsFromReadFile - "NotFound" + errorsFrom2ndReadFile
+
+		.pipe(str => str.concat(str))
+		.pipe(uploadFile)  // pipe can also launch and wait for prcs to be returned
+
+
+}
+
+
+
+/*
+
+
+*/

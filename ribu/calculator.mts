@@ -1,4 +1,5 @@
-import {go, Monitor, Ch, freeGo} from "ribu"
+import {go, Group, Ch, freeGo} from "ribu"
+import { err } from "./error-modeling.js"
 
 /*
 	- A state is a prc
@@ -28,12 +29,24 @@ type State = {
 
 let state: State = {}
 
-const prcS = Monitor()
+let prcS: Group
+
+go(function* supervisor() {
+	prcS = Group()
+	for (;;) {
+		const prcRet = yield* prcS.rec
+		if (err(prcRet)) {
+			yield* prcS.cancel()
+		}
+	}
+})
 
 prcS.go(function* C() {
-	yield CButton.onClick
-	yield prcS.cancel()
-	prcS.go(start)
+	while (true) {
+		yield* CButton.onClick
+		yield* prcS.cancel()
+		prcS.go(start)
+	}
 })
 
 
@@ -99,7 +112,7 @@ function* Operand1(but) {
 
 function any(...eventNames: string[]) {
 	// subscribe to those events an returns a channel that resolves
-	// when any of those occured. This can me typed.
+	// when any of those occured. This can be typed.
 }
 
 

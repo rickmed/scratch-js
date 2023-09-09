@@ -1,18 +1,19 @@
-import { go, chBuff, waitErr, workerGo, readdir, onCancel, e } from "ribu"
+import { go, chBuff, Group, workerGo, readdir, onCancel, err, Ch } from "ribu"
 import {cpus} from "node:os"
 
 go(function* main() {
 	const sophiConfig = {}
-
+	const resultsCh = Ch<string>()
 	const $locateFiles = locateFiles(sophiConfig)
-	const $reporter = go(reporter)
-
 	const workers = cpus()
-		.map(() => workerGo("./sophiWorker.mjs", $locateFiles, $reporter))
+		.map(() => workerGo("./sophiWorker.mjs", $locateFiles, resultsCh))
 
-	// const res = yield* waitErr($locateFiles, $reporter, ...workers)
-	// console.log("sophi done. Goodbye")
-	return "done"
+	const res = yield* waitErr($locateFiles, go(reporter, resultsCh), ...workers)
+
+	if (err(res)) {
+		// ...
+	}
+	console.log("sophi done. Goodbye")
 })
 
 
@@ -56,9 +57,9 @@ function locateFiles(sophiConfig) {
 
 
 
-function reporter() {
+function* reporter(resultsCh) {
 	while (true) {
-		this.testResults.rec
+		const str = yield* resultsCh.rec
 		// print things or whatever
 	}
 }

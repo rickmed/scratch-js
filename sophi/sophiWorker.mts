@@ -1,4 +1,4 @@
-import { go, Go, Ch, cancel, DONE, type Prc } from "ribu"
+import { go, Go, Ch, DONE, type Prc, Group, me } from "ribu"
 import { E, e } from "../ribu/error-modeling"
 import { error } from "effect/Brand"
 
@@ -7,12 +7,12 @@ import { error } from "effect/Brand"
 	otherwise, file processing in other workers won't be cancelled
 */
 
-function* worker($locateFiles, $reporter) {
+function* worker($locateFiles, resultsCh) {
 	const onlyUsedCh = Ch()
 	const resumeCh = Ch()
 	const {filePathS} = $locateFiles
 
-	let $loadFileS: Array<unknown> = []
+	let $loadFileS = Group()
 
 	const handleFilePath = go(function* handleFilePath() {
 
@@ -22,8 +22,7 @@ function* worker($locateFiles, $reporter) {
 
 			// this guy probably shouldn't churn $loadFile prcS, but should create
 			// a fixed amount of workers.
-			const $loadFile = go(loadFile, filePath, onlyUsedCh, $reporter)
-			$loadFileS.push($loadFile)
+			$loadFileS.go(loadFile, filePath, onlyUsedCh, resultsCh)
 		}
 
 		// this guy will block here and wait when all it's $loadFileS childS are done
@@ -31,13 +30,9 @@ function* worker($locateFiles, $reporter) {
 	})
 
 	const handleOnlyUsed = go(function* handleOnlyUsed() {
-		const prc = yield onlyUsedCh
+		const prc = yield* onlyUsedCh
 
-		// If cancel(...) fails ribu will
-		// terminate calling prc (handleOnlyUsed) with some Err.
-		// Since worker's waitErr cancels eveything at any Err, it will terminate with err.
-
-		yield cancel($locateFiles, ...pluck(prc, $loadFileS))
+		yield* $loadFileS.pluck(prc).cancel()
 
 		go(flushQueue($locateFiles.filePathS))  // flush chans is almost always unnecessary
 		yield resumeCh.put()  // resume only one worker
@@ -49,17 +44,17 @@ function* worker($locateFiles, $reporter) {
 }
 
 
-function* loadFile(filePath, onlyUsedCh, resumeCh, $reporter) {
+function* loadFile(filePath, onlyUsedCh, resumeCh, resultsCh) {
 	const onlyUsed = yield fileSuite(filePath)
 	if (onlyUsed) {
 		const shouldResume = Ch()
-		yield onlyUsedCh.put(this)
+		yield onlyUsedCh.put(me())
 		yield resumeCh
 		// if I continue here it means I wasn't cancelled
 		const testsResult = processFile(filePath)
 		while (true) {
 			const testResult = yield* testsResult.rec
-			$reporter.send(testResult)
+			yield* resultsCh.put(testResult)
 		}
 	}
 }
