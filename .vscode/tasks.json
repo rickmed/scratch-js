@@ -7,7 +7,13 @@
       "label": "tsx run current file",
       "type": "shell",
       "command": "clear; tsx ${file}",
-      "problemMatcher": [],
+      "problemMatcher": []
+    },
+    {
+      "label": "node run current file",
+      "type": "shell",
+      "command": "clear; node ${file}",
+      "problemMatcher": []
     }
   ]
 }

@@ -1,4 +1,6 @@
-import { sleep } from "./ribu/cancellableResource.mjs"
+import {go, wait, childS} from "ribu"
+
+/*
 
 async def child2():
     print("  child1: started! sleeping now...")
@@ -18,13 +20,13 @@ async def parent():
         # -- we exit the nursery block here --
     print("parent: all done!")
 
-
+ */
 
 /* ************************************************* */
 
 function* child() {
 	console.log("child started")
-	yield sleep(1)
+	yield* wait(1)
 	console.log("child exiting")
 }
 
@@ -35,6 +37,6 @@ go(function* parent() {
 	console.log("parent: spawning child2")
 	go(child)
 	console.log("parent: waiting for children to finish...")
-	const res = yield waitAll
+	yield* myJobs().waitOrEnd
 	console.log("parent: all done")
 })

@@ -1,12 +1,12 @@
-import {go, Group, Ch, freeGo} from "ribu"
-import { err } from "./error-modeling.js"
+import {go, myJobs, Ch, me, cancel, Pool } from "ribu"
+import { e } from "./ribu-errors.js"
 
-/*
+/* Statechart implementation in ribu.
+
 	- A state is a prc
 
 	- Arrow going into a substate:
-		- arrow : parameter
-			- Check parameter to launch some prc.
+		- arrow: parameter (check parameter to launch what substate/prc to launch).
 
 	- An Arrow going out of grouped states:
 		- Composition: group of waiting events can be reused in +1 states.
@@ -14,86 +14,98 @@ import { err } from "./error-modeling.js"
 
 	- Arrow conditions are just if statements within a prc.
 
-	- UI Effects?
+ * Key ribu learnings:
+		- "free" version of go() is wrong bc it leads to ambiguity of which
+		is the prc's ancestor, which breaks throw/catch.
+		- solution is for some ancestor access its child_s() and pass down, so
+		that children can launch prcS from that bundle.
 */
 
 // channels
 const buttons = Ch()
 
 // state is reactive
-type State = {
+type Model = {
 	num1?: number,
 	num2?: number,
 	op?: "+" | "-",  // ...
+	init(): void
 }
 
-let state: State = {}
+let model: Model = {
+	init() {
+		this.num1 = undefined
+		this.num2 = undefined
+		this.op = undefined
+	}
+}
 
-let prcS: Group
+let jobs: Pool<void>
 
-go(function* supervisor() {
-	prcS = Group()
-	for (;;) {
-		const prcRet = yield* prcS.rec
-		if (err(prcRet)) {
-			yield* prcS.cancel()
+go(function* main() {
+	jobs = myJobs()
+
+	jobs.go(function* C() {
+		while (true) {
+			yield* C_button.onClick
+			const siblings = jobs.toSpliced(jobs.indexOf(me()), 1)
+			yield* cancel(siblings).$  // cancel() can pass Job | Job[]
+			jobs.go(start)
 		}
-	}
-})
+	})
 
-prcS.go(function* C() {
-	while (true) {
-		yield* CButton.onClick
-		yield* prcS.cancel()
-		prcS.go(start)
-	}
+	go(start)
+
+}).catchRun((err: Error) => {
+
 })
 
 
-prcS.go(start)
-
+// if/when start* launches another prc. It finishes, so Group
+	// needs to delete the pointer to start* (or memory leak otherwise)
 
 function* start() {
-	// or can type op and now state is {num1: 0, op: op} and now listening for num2
-	state = {}
+	model.init()
 	const but = yield* buttons.rec
 	if (isZero9OrDot(but)) {
-		prcS.freeGo(Operand1, but)  // freeGo used so that start has no active children to wait
+		// *Operand1 is not a child of *start, but of *supervisor, so *start can finish
+			// without waiting for *Operand1 to finish.
+		// IMPLEMENTATION: *supervisor's children changes all the time, so when some
+			// finishes and others are added, ribu needs to handle internally _when_ to let supervisor finish.
+		jobs.go(Operand1, but)
 	}
 	if (isNegOp(but)) {
-		prcS.freeGo(NegNum, but)
+		jobs.go(NegNum, but)
 	}
 }
-
 
 
 function* Operand1(but) {
 	let prc =
 		but === 0 ? go(zero) :
-		but === one9 ? go(beforeDot) :
+		but === "1-9" ? go(beforeDot) :
 		go(afterDot)
-
 
 	const _but = yield* button(op, percentage, CE).rec
 	yield prc.cancel()
-	if (but === percentage) prcS.freeGo(result)
-	if (but === CE) prcS.freeGo(start)
-	prcS.freeGo(OpEntered)
+	if (but === percentage) jobs.go(result)
+	if (but === CE) jobs.go(start)
+	jobs.go(OpEntered)
 
 	// helpers
 	function* zero() {
 		const but = yield* buttons(one9, dot).rec  // rest of buttons are disabled and not listening
 		if (isOne9(but)) {
-			prc = freeGo(beforeDot)
+			prc = go(beforeDot)
 		}
-		prc = freeGo(beforeDot)
+		prc = go(beforeDot)
 	}
 
 	function* beforeDot() {
 		while (true) {
 			const but = yield* buttons(zero9, dot).rec
 			if (isDot(but)) {
-				prc = freeGo(afterDot)
+				prc = go(afterDot)
 				return
 			}
 			continue

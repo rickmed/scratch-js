@@ -1,18 +1,18 @@
-import { go, chBuff, Group, workerGo, readdir, onCancel, err, Ch } from "ribu"
+import { go, chBuff, myJobs, workerGo, readdir, onCancel, err, Ch } from "ribu"
 import {cpus} from "node:os"
 
 go(function* main() {
 	const sophiConfig = {}
 	const resultsCh = Ch<string>()
 	const $locateFiles = locateFiles(sophiConfig)
-	const workers = cpus()
-		.map(() => workerGo("./sophiWorker.mjs", $locateFiles, resultsCh))
-
-	const res = yield* waitErr($locateFiles, go(reporter, resultsCh), ...workers)
-
-	if (err(res)) {
-		// ...
+	for (const cpu of cpus()) {
+		workerGo("./sophiWorker.mjs", $locateFiles, resultsCh)
 	}
+	go(reporter, resultsCh)
+
+	// res :: Error
+	const res = yield* myJobs().waitErr
+	// log(res) or whatever
 	console.log("sophi done. Goodbye")
 })
 
@@ -20,12 +20,12 @@ go(function* main() {
 function locateFiles(sophiConfig) {
 
 	const { include: { folders, subStrings, extensions } } = sophiConfig
-	const filePathS = chBuff<string>(30)
+	const filePaths = chBuff<string>(30)
 
 	return go(function* locateFiles() {
 
 		onCancel(function* () {
-			yield* filePathS.putDone()   // just a wrapper of ch.put(DONE)
+			yield* filePaths.putDone()   // just a wrapper of ch.put(DONE)
 		})
 
 		for (const dir of sophiConfig.folders) {
@@ -43,7 +43,7 @@ function locateFiles(sophiConfig) {
 			// entries can be an error, maybe readdir can return a ch<file | err>
 			for (const entry of entries) {
 				if (entry.isFile() && hasCorrectNamesAndExtensions(entry)) {
-					yield* filePathS.put(entry.path)
+					yield* filePaths.put(entry.path)
 				}
 				if (entry.isDirectory()) {
 					go(readDir(entry.path))
@@ -51,11 +51,8 @@ function locateFiles(sophiConfig) {
 			}
 		}
 
-	}).ports({filePathS})
+	}).ports({filePaths})
 }
-
-
-
 
 function* reporter(resultsCh) {
 	while (true) {
@@ -63,8 +60,6 @@ function* reporter(resultsCh) {
 		// print things or whatever
 	}
 }
-
-
 
 function hasCorrectNamesAndExtensions(fileName) {
 	const fileExt = extname(fileName).slice(1)

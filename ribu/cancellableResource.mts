@@ -1,19 +1,18 @@
 import { go, Ch, onCancel, Cancellable, BroadcastCh } from "ribu"
-import { readdir, readFile as readFileProm } from "node:fs/promises"
+import fs from "node:fs/promises"
 import { readFile } from "node:fs"
-import { provideContext } from "effect/Schedule"
-import { type } from "effect/Match"
 
-/* Why wrap io leaves in go() vs just yield*:
-
+/* Why wrap io leaves in go() vs just yield* a promise:
 	1) can't cancel delegated gen
 		- onCancel(() => {}) doesn't work bc if the process already has it set up (would overwrite)
-
 	2) Loses nice stack trace with genName and args on delegated gen
-
 	3) Can't compose, eg, if want to launch two in parallel.
 */
 
+/*
+	- main thing: cancel promise
+		ie, need to associate cancel with the prc returned from the wrapper.
+*/
 function myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args)  {
 	return go(_myReadFile(...args))
 
@@ -25,7 +24,7 @@ function myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args)
 		onCancel(() => controller.abort())  // throws if main calls onCancel()
 
 		try {
-			const prom = readFileProm(...args)
+			const prom = fs.readFile(...args)
 			const file: Awaited<typeof prom> = yield prom
 
 			// need to implement return vals to use Prc.done and not create another Ch here internally
@@ -47,17 +46,12 @@ function myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args)
 }
 
 
-/* Avoid .rec */
+/* Avoid .val */
 go(function* main() {
 	const result = yield* myReadFile("foo.txt", { encoding: "utf8" })
 	const prc = myReadFile("foo.txt", { encoding: "utf8" })
 	const prc2 = myReadFile("foo.txt", { encoding: "utf8" })
 	let procs = [prc, prc2]
-
-// within theIterator.next(): I could check what op is being made
-	// and if it's a prc, return {done: true, value: prc.IOmsg}
-		// IOmsg is is set as the return val of prc (prc.status === DONE)
-
 })
 
 
@@ -115,19 +109,19 @@ function cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>)
 		if (err) {
 			if (err.code === "ENOENT") {
 				// not sure if type-inferrence this will be possible
-				prc.resume(E("NotFound", err))
+				prc.resolve(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
-				prc.resume(E("NotFound", err))
+				prc.resolve(E("NotFound", err))
 			}
 		}
-		prc.resume(data)
+		prc.resolve(data)
 	}
 
 	args.push(cb)
 	cbBasedFn(...args)
 
-return prc
+	return prc
 }
 
 function* main() {

@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
      "strict": true,
-     "module": "Node16",
-     "moduleResolution": "Node16",
-     "moduleDetection": "force",
-     "target": "ES2022",
+     "module": "NodeNext",
+     "moduleResolution": "NodeNext",
+     "moduleDetection": "auto",
+     "target": "ESNext",
      "skipDefaultLibCheck": true,
      "sourceMap": true,
      "strictPropertyInitialization": true,

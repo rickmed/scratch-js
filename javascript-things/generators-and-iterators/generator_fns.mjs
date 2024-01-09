@@ -2,6 +2,7 @@
 
 let yielded
 
+
 /*** Generator functions general usage of .next() *************************** */
 
 // function* hey() {
@@ -31,11 +32,15 @@ let yielded
 
 /*** gen.throw() ************************************************************ */
 
-/***  */
-
+// Gen implements catch
 // function* gen1() {
 // 	try {
 // 		yield 1
+// 		yield 2
+// 	}
+// 	catch (err) {
+// 		console.log(err)
+// 		yield 3
 // 	}
 // 	finally {
 // 		// some cleanup probably.
@@ -44,25 +49,58 @@ let yielded
 // 		return "done"
 // 	}
 // }
-//
-// const genObj = gen1()
-//
-// let yielded;
-// yielded = genObj.next()
-// console.log(yielded)
-// yielded = genObj.throw("yo")
-// console.log(yielded)
-// yielded = genObj.next()
-// console.log(yielded)
 
+// const gen = gen1()
+// console.log(yielded = gen.next())  // { value: 1, done: false }
+// console.log(yielded = gen.throw('theErr'))  // logs "theRR", returns { value: 3, done: false }
+
+
+// // Gen DOESN'T implement catch
+// function* gen1() {
+// 	yield 1
+// 	yield 2
+// }
+
+// const gen = gen1()
+// console.log(yielded = gen.next())  // { value: 1, done: false }
+// try {
+// 	yielded = gen.throw('theErr')
+// }
+// catch (err) {
+// 	console.log(`runtime didn't explote`)
+// 	console.log(err)   // logs "theErr"
+// }
+
+// Stack Traces
+function fn2() {
+	throw yo
+}
+function fn1() {
+	return fn2()
+}
+function* genFn() {
+	yield 1
+	fn1()
+}
+
+const gen = genFn()
+yielded = gen.next()
+console.log(yielded)
+try {
+	yielded = gen.next()
+}
+catch (e) {
+	// console.log(Error(e))
+	console.log(e.message)
+}
 
 
 /*** setting "this" used inside the gen ************************************ */
 
-// function* hi() {
-// 	console.log(this.hey)
+// function* hi(this: {hey: number}) {
+// 	console.log(this.hey)  // 2
 // 	yield
-// 	console.log(this.hey)
+// 	console.log(this.hey)   // 5
 // }
 // const obj = {hey: 2}
 // const gen3 = hi.call(obj)
@@ -71,6 +109,7 @@ let yielded
 // obj.hey = 5
 // yielded = gen3.next()
 // console.log("sone", yielded)
+
 
 
 /*** gen.return() and try/finally ******************************************* */
@@ -145,18 +184,16 @@ let yielded
 // function* main() {
 // 	const res = yield* sub()
 // 	console.log({res})
-// 	return "MAIN DONE"
+// 	return `MAIN DONE`
 // }
 
 // const gen = main()
-// yielded = gen.next()
-// console.log(yielded)
-// yielded = gen.next()
-// console.log(yielded)
-// yielded = gen.next()
-// console.log(yielded)
-// yielded = gen.return("THIS")  // return "MAIN DONE" never executes
-// console.log(yielded)
+
+// console.log(yielded = gen.next())  // { value: 'sub 1', done: false }
+// console.log(yielded = gen.next())  // { value: 'sub 2', done: false }
+// console.log(yielded = gen.next())  // { res: 'sub 3' }
+// console.log(yielded = gen.return("THIS"))  // { value: 'MAIN DONE', done: true }
+
 
 
 /* +++  micro-benchmark vs reg fn +++++++++++++++++++++++++++++++++++++++++++ */
@@ -205,6 +242,7 @@ let yielded
 // console.log(y)  // { value: 1, done: false }
 // y = gen.next()
 // console.log(y)
+
 
 /* +++  Simple interpreter  +++++++++++++++++++++++++++++++++++++++++++++++++ */
 
