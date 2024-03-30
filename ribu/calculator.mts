@@ -61,7 +61,7 @@ go(function* main() {
 })
 
 
-// if/when start* launches another prc. It finishes, so Group
+// if/when start* launches another prc, it finishes, so jobs
 	// needs to delete the pointer to start* (or memory leak otherwise)
 
 function* start() {

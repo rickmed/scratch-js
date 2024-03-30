@@ -12,9 +12,8 @@ export function E<Name extends string = string>(name: Name, msg?: string): E<Nam
 }
 
 // msg: "cancelled by genFn.name"
-export const CANC_OK_NAME = "CancelledOK" as const
-export const ECancOK = (msg: string) => E(CANC_OK_NAME, msg)
-
+export const ECancOK = (msg: string) => E("CancelledOK", msg)
+export type ECancOK = ReturnType<typeof ECancOK>
 
 // export function ExtError<Name extends string = string>(name: Name, ogErr: Error): E<Name> {
 // 	ogErr.name = name
@@ -23,12 +22,13 @@ export const ECancOK = (msg: string) => E(CANC_OK_NAME, msg)
 
 
 /*
-nodejs/js Error is { name, message, cause?, stack? }
+- js Error is { name, message, cause?, stack? }
+
 - Ribu uses .name and extends it (inspects every genFn return if instanceof Error) with:
 	- genFn, args
 
 - Error aggregations:
-	- All jobsRet :: BodyReturnType | ECancelledOk | EOnEnd | ...
+	- All jobsRet :: BodyReturnType | ECancOk | AggregateError
 	- Errors can occur:
 		- Throw in genFnBody
 		- child genFn fails while waiting for them
