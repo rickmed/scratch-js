@@ -1,11 +1,7 @@
-function hi() {
-	// throw Error("epale")
-	throw "dsadsad"
-}
+import { EventEmitter } from "node:events"
 
-try {
-	hi()
-}
-catch (e) {
-	console.log("EROOOR", e)
-}
+const y = new EventEmitter()
+
+y.on("312", (x: number) => {
+
+})

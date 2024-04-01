@@ -1,5 +1,5 @@
 import {go, myJobs, Ch, me, cancel, Pool } from "ribu"
-import { e } from "./ribu-errors.js"
+import { e } from "./ribu-errors.mjs"
 
 /* Statechart implementation in ribu.
 

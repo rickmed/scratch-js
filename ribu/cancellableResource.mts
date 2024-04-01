@@ -101,31 +101,30 @@ export type Res<Args extends any[]> =
 type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 
-function cbToProcess<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
+function cbToJob<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
-	const prc = Prc()
+	const job = Job<ENotFound | EPerm>()
 
 	function cb(err, data) {
 		if (err) {
 			if (err.code === "ENOENT") {
-				// not sure if type-inferrence this will be possible
-				prc.resolve(E("NotFound", err))
+				job.settle(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
-				prc.resolve(E("NotFound", err))
+				job.settle(E("Perm", err))
 			}
 		}
-		prc.resolve(data)
+		job.settle(data)
 	}
 
 	args.push(cb)
 	cbBasedFn(...args)
 
-	return prc
+	return job
 }
 
 function* main() {
-	const res = yield* cbToProcess(readFile, "foo.txt", { encoding: "utf8" })
+	const res = yield* cbToJob(readFile, "foo.txt", { encoding: "utf8" })
 }
 
 

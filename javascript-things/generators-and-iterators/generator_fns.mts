@@ -71,29 +71,30 @@ let yielded
 // 	console.log(err)   // logs "theErr"
 // }
 
-// Stack Traces
-function fn2() {
-	throw yo
-}
-function fn1() {
-	return fn2()
-}
-function* genFn() {
-	yield 1
-	fn1()
-}
+// // Stack Traces
+// function fn2() {
+// 	throw yo
+// }
+// function fn1() {
+// 	return fn2()
+// }
+// function* genFn() {
+// 	yield 1
+// 	fn1()
+// }
 
-const gen = genFn()
-yielded = gen.next()
-console.log(yielded)
-try {
-	yielded = gen.next()
-}
-catch (e) {
-	// console.log(Error(e))
-	console.log(e.message)
-}
+// const gen = genFn()
+// yielded = gen.next()
+// console.log(yielded)
+// try {
+// 	yielded = gen.next()
+// }
+// catch (e) {
+// 	// console.log(Error(e))
+// 	console.log(e.message)
+// }
 
+// console.log(gen.next())
 
 /*** setting "this" used inside the gen ************************************ */
 
@@ -241,7 +242,7 @@ catch (e) {
 // y = gen.next()
 // console.log(y)  // { value: 1, done: false }
 // y = gen.next()
-// console.log(y)
+// console.log(y)  // { value: undefined, done: true }
 
 
 /* +++  Simple interpreter  +++++++++++++++++++++++++++++++++++++++++++++++++ */
@@ -259,3 +260,55 @@ catch (e) {
 // 		return
 // 	}
 // }
+
+
+// // /*** "using"  *************************************************************** */
+
+// const rsc = {
+// 	[Symbol.dispose]() {
+// 		console.log("disposing")
+// 	}
+// }
+
+// function* genFn() {
+// 	using rrr = rsc
+// 	yield 1
+// }
+
+// const gen = genFn()
+// console.log(yielded = gen.next())
+// console.log(yielded = gen.next())
+
+
+
+/***  finally  ****************************************************************/
+
+const rsc = {
+	[Symbol.dispose]() {
+		console.log("disposing")
+	}
+}
+
+function* genFn() {
+	using rrr = rsc
+	try {
+		yield 1
+		return true
+	}
+	finally {
+		console.log("finally 1")
+		try {
+			yield 3
+		}
+		finally {
+			console.log("finally 2")
+			return "done finally"
+		}
+	}
+}
+
+const gen = genFn()
+console.log(yielded = gen.next())
+// nested finally
+console.log(yielded = gen.return(90))   // "finally 1", { value: 3, done: false }
+console.log(yielded = gen.next())  // "finally 2", "disposing", { value: undefined, done: true }

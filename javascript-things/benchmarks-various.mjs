@@ -73,9 +73,9 @@
 
 
 
-// /* ----  Sync vs AsyncAwait/Promises  ----  */
+// /* ----  sync vs async-await calls  ----  */
 
-// // Sync: no async/await
+// // sync:
 
 // function two(i) {
 // 	return i
@@ -97,7 +97,7 @@
 // // calling main -> two: ~5ms
 // // calling only main: ~4ms
 
-// // Async/await
+// // async-await:
 
 // async function three(i) {
 // 	return i
@@ -254,3 +254,124 @@
 // 	// for..of: ~10-100x
 // 	// forEach: ~10-80xms
 // 	// Set: ~200x
+
+
+
+// /***  Array splice vs delete  *************************************************/
+
+// const arrL = 1_000_000
+// const arr = Array.from({length: arrL}, (_, i) => 1)
+// const arr2 = Array.from({length: arrL}, (_, i) => 1)
+
+// // delete middle item
+// let now = performance.now()
+// delete arr[50000]
+// console.log(performance.now() - now, "delete")
+
+// // mark undefined middle item
+// now = performance.now()
+// arr[50000] = undefined
+// console.log(performance.now() - now, "mark undefined")
+
+// // splice middle item
+// now = performance.now()
+// arr.splice(50000, 1)
+// console.log(performance.now() - now, "splice")
+
+// CONCLUSION:
+	// mark undefined is 10000x faster than splice()
+	// and 2x faster than delete
+
+
+// /***  Array iteration vs idem but with conditional  ***************************/
+// const benchIterations = 100_000
+
+// const arr1 = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
+// const arr2 = [{}, {}, undefined, {}, {}, {}, undefined, {}, {}, {}]
+
+// let sum = 0
+
+// let now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	for (let j = 0; j < 10; j++) {
+// 		const x = arr1[j]
+// 		if (x === undefined) sum++
+// 		else sum++
+// 	}
+// }
+// console.log(performance.now() - now, "With conditional")
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	for (let j = 0; j < 10; j++) {
+// 		sum++
+// 	}
+// }
+// console.log(performance.now() - now, "No conditional")
+
+// // CONCLUSION:
+// 	// No conditional is %50 faster
+
+
+// /***  class dynamic key lookup vs array heterogeneous iteration  **************/
+// const benchIterations = 1000000
+
+// class One {}
+
+// const one = new One()
+
+// one["hello1"]
+// one["hello2"]
+// one["hello3"]
+// const arrLen = 3
+// one["hello4"] = Array.from({length: arrLen}, (_, i) => 1)
+// one["hello5"]
+
+// let now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	const arr = one["hello4"]
+// 	for (let j = 0; j < arrLen; j++) {
+// 		arr[j]
+// 	}
+// }
+// console.log(performance.now() - now, "class dynamic key")
+
+// // array
+// const arrL = 10
+// const arr = Array.from({length: arrL}, (_, i) => 1)
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	for (let j = 0; j < arrL; j++) {
+// 		arr[j]
+// 	}
+// }
+// console.log(performance.now() - now, "array iteration")
+
+// // CONCLUSION:
+// 	// dynamic key lookups are very fast, even compared to arr iteration
+// 	// no gain in putting all keys in heterogeneous array
+
+
+/***  Cost of creating a js fn closure  ***************************************/
+// add firs 1_000_000 numbers
+const benchIterations = 1_000_000
+
+let now = performance.now()
+let count = 0
+for (let i = 0; i <= benchIterations; i++) {
+	count++
+}
+console.log(performance.now() - now, "without closure")
+
+now = performance.now()
+let fn
+for (let i = 0; i <= benchIterations; i++) {
+	fn = function () {
+		count++
+	}
+	fn()
+}
+console.log(performance.now() - now, "fn closure")
+// CONCLUSION:
+	// fn closures: ~15ms, ie are fast.

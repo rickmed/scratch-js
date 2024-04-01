@@ -345,18 +345,17 @@ rm-todo:
 	)
 */
 
-const If = ui(function* If_(predFn: () => boolean, scnCtor1: ScnCtor, scnCtor2: ScnCtor) {
+export const If = ui(_If)
+
+function* _If(predFn: () => boolean, scnCtor1: ScnCtor, scnCtor2: ScnCtor) {
 
 	const computed_ = computed(predFn)
 	const computedVals = Ch()
 	const disposeComputed = effect(() => {
 		computedVals.put(computed_.value)
 	})
-
 	// rm-todo: make theses resources autoclean when *If_ ends.
-	onEnd(() => {
-		disposeComputed()
-	})
+	onEnd(disposeComputed)
 
 	let activeScn = computed_.peek() === true ? scnCtor1() : scnCtor2()  // launches jobS as side effect
 	const parentDom = getParentDom()
@@ -372,8 +371,7 @@ const If = ui(function* If_(predFn: () => boolean, scnCtor1: ScnCtor, scnCtor2: 
 		parentDom.replaceChild(newScn.dom, activeScn.dom)
 		activeScn = newScn
 	}
-})
-
+}
 
 
 
