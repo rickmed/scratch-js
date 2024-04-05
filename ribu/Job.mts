@@ -2,6 +2,11 @@ import { ArrSet, Events } from "./data-structures.mjs"
 import { ECancOK, Errors, isE } from "./ribu-errors.mjs"
 import { runningJob, sys } from "./system.mjs"
 
+export const GenFn = (function* () { }).constructor
+function isGenFn(x: unknown): x is GenFn {
+	return x instanceof GenFn
+}
+
 /* observe-resume model:
 	- Things subscribe to job._on(EV.JOB_DONE, cb) event when want to be notified
 	when it's done.
@@ -23,6 +28,11 @@ import { runningJob, sys } from "./system.mjs"
 
 - Maybe optimize sleep()
 - Also, can only use one resource, if need +1, wrap them in one
+*/
+
+/* End and Cancel Protocols
+
+
 
 */
 
@@ -59,12 +69,15 @@ type GenFnRet<GenFn> =
 	(...args: any[]) => Generator<unknown, infer Ret> ? Ret
 	: never
 
-type Fn = () => unknown
-type OnEnd = Fn | AsyncRsc | Disposable | AsyncDisposable
+type FnOf<T = unknown> = () => T
+type OnEnd =
+	FnOf | Disposable |
+	FnOf<PromiseLike<unknown>> | AsyncDisposable | GenFn
 
-type AsyncRsc = () => PromiseLike<unknown> | (() => Job)
 type JobDoneCB<Ret> = (j: Job<Ret>) => void
 type State = "RUN" | "PARK" | "GENFN_DONE" | "WAIT_CHILDS" | "CANCEL" | "DONE_OK" | "DONE_ERR"
+
+const tryFnFailed = Symbol("f")
 
 /* Job class */
 export class Job<Ret = unknown, Errs = unknown> extends Events {
@@ -76,12 +89,11 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 	_gen: Gen
 	_name: string
 	_state: State = "RUN"
-	_next: undefined | "cont" | "$"  // implement with _state
+	_next: undefined | "cont" | "$"  // implement with ._state
 	_childs: undefined | ArrSet<Job<Ret>>
 	_parent: undefined | Job
 	_sleepTO: undefined | NodeJS.Timeout
-	_syncRscs: undefined | Fn | Fn[]
-	_asyncRscs: undefined | AsyncRsc | AsyncRsc[]
+	_onEnd: undefined | OnEnd | OnEnd[]
 
 	constructor(withParent: boolean, genFn: GenFn, ...args: unknown[]) {
 		super()
@@ -160,14 +172,14 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 				var yielded = this._gen.next()  // eslint-disable-line no-var
 			}
 			catch (e) {
-				this._ridRscs([errify(e)])
+				this.#endProtocol([errify(e)])
 				return
 			}
 
 			sys.stack.pop()
 
 			if (yielded.done) {
-				this._genFnRet(yielded.value as Ret)
+				this._genFnDone(yielded.value as Ret)
 			}
 
 			// ?? done === false, ie, park
@@ -175,47 +187,136 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		}
 	}
 
-	_genFnRet(yieldVal: Ret) {
+	_genFnDone(yieldVal: Ret) {
 		this.val = yieldVal
 		this._state = "GENFN_DONE"
 		if (this._childs?.size) this._waitChilds()
-		else this._ridRscs()
+		else this.#endProtocol()
 	}
 
 	_waitChilds() {
 
 		this._state = "WAIT_CHILDS"
-		const cs = this._childs!
-		const self = this
+		const childs = this._childs!
+		const thisJ = this
 
-		let nCs = cs.size
+		let nCs = childs.size
 		let nCsDone = 0
 
 		for (let i = 0; i < nCs; i++) {
-			const c = cs.arr_m[i]
+			const c = childs.arr_m[i]
 			if (c) c._on(EV.JOB_DONE_WAITCHILDS, cb)
 		}
 
-		function cb(cDone: Job) {
-
+		function cb(childDone: Job) {
 			++nCsDone
-
-			if (cDone._state === "DONE_ERR") {
-				self.#offWaitChildsCBs(cs)
-				self._ridRscs([cDone.val] as Error[])
+			if (childDone._state === "DONE_ERR") {
+				thisJ.#deleteWaitChildsCBs()
+				thisJ.#endProtocol([childDone.val] as Error[])
+				return
 			}
-
 			if (nCsDone === nCs) {
-				self._ridRscs()
+				thisJ.#endProtocol()
 			}
 		}
+
 	}
 
-	#offWaitChildsCBs(cs: ArrSet<Job>) {
+	#deleteWaitChildsCBs() {
+		const cs = this._childs!
 		const csL = cs.size
 		for (let i = 0; i < csL; i++) {
 			const c = cs.arr_m[i]
 			if (c) c._offAll(EV.JOB_DONE_WAITCHILDS)
+		}
+	}
+
+	#endProtocol(errs?: Error[]) {
+		const { _childs: cs, _sleepTO, _onEnd: ends } = this
+
+		if (_sleepTO) clearTimeout(_sleepTO)
+
+		if (!(ends || (cs && cs.size > 0))) {
+			this.#settle(errs)
+			return
+		}
+
+		const self = this
+		let nAsyncWaiting = 0
+		let nAsyncDone = 0
+		let errors: undefined | Error[]
+
+		if (cs) {
+			nAsyncWaiting += cs.size
+			const { arr_m } = cs
+			const chsL = arr_m.length
+			for (let i = 0; i < chsL; i++) {
+				const c = arr_m[i]
+				if (c) {
+					c.cancel()
+					c._on(EV.JOB_DONE, jDone)
+				}
+			}
+		}
+
+		if (ends) {
+			if (Array.isArray(ends)) {
+				const l = ends.length
+				for (let i = l; i >= 0; --i) {  // called LIFO
+					execEnd(ends[i]!)
+				}
+			}
+			else execEnd(ends)
+		}
+
+		function execEnd(x: OnEnd): void {
+			if (isGenFn(x)) {
+				++nAsyncWaiting
+				new Job(false, x)._on(EV.JOB_DONE, jDone)
+			}
+			else if (x instanceof Function) {
+				const endRet = tryFn(x)
+				if (endRet === tryFnFailed) return
+				if (isProm(endRet)) {
+					++nAsyncWaiting
+					endRet.then(_ => asyncDone(), x => asyncDone(errify(x)))
+				}
+				// else: is () => !Promise, so it's already ran
+			}
+			else if (Symbol.dispose in x) {
+				tryFn(x[Symbol.dispose].bind(x))
+			}
+			else {
+				++nAsyncWaiting
+				x[Symbol.asyncDispose]().then(_ => asyncDone(), x => asyncDone(errify(x)))
+			}
+		}
+
+		function tryFn(fn: FnOf) {
+			try {
+				var res = fn()
+			}
+			catch (e) {
+				if (!errs) errs = []
+				errs.push(errify(e))
+				return tryFnFailed
+			}
+			return res
+		}
+
+		function asyncDone(x?: Error) {
+			++nAsyncDone
+			if (x) {
+				if (!errs) errs = []
+				errs.push(x)
+			}
+			if (nAsyncDone === nAsyncWaiting) {
+				self.#settle(errs)
+			}
+		}
+
+		function jDone(j: Job) {
+			asyncDone(j._state === "DONE_ERR" ? j.val as Error : undefined)
 		}
 	}
 
@@ -233,133 +334,39 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		// reuse this.val since it won't be anything returned by genFn
 		this.val = caller._name as Ret
 
-		const { _state, _childs: cs } = this
+		const { _state, _childs } = this
 
-		if (_state === "WAIT_CHILDS" && cs) {
-			this.#offWaitChildsCBs(cs)
+		// todo: need to change state in ridRscs so && _childs is superfluous
+		if (_state === "WAIT_CHILDS" && _childs) {
+			this.#deleteWaitChildsCBs()
 		}
 
 		this._state = "CANCEL"
-		this._ridRscs()
+		this.#endProtocol()
 		return this
 	}
 
-	_ridRscs(errs?: Error[]) {
-		const { _syncRscs, _childs, _asyncRscs, _sleepTO } = this
+	// all paths, end up going endProtocol() -> settle()
+	// endProtocol() need to always be called bc there may be activeChilds, timeout, onEnd...
 
-		if (_sleepTO) clearTimeout(_sleepTO)
+		// genFnRet()  ->  this.val = yielded.val   (unless endProtocol fails after)
+		// _cancel()  ->  ECancOK   (unless endProtocol fails after)
+		// genFnThrew()  ->  first err in Errors
+		// Sooo, within _genFnRet() need to check if it was called after cancellation ??
+		// or does settle() overwrites?
 
-		if (_syncRscs) {
-			errs = this._ridSyncRscs(errs)
-		}
-
-		if (!(_asyncRscs || (_childs && _childs.size > 0))) {
-			this._settle(errs)
-			return
-		}
-
-		this._ridAsyncRscs(errs)
-	}
-
-	_ridSyncRscs(errs?: Error[]) {
-		const rscs = this._syncRscs!
-		if (typeof rscs === "function") {
-			return this.#execFn(rscs)
-		}
-		const rL = rscs.length
-		for (let i = rL; i >= 0; --i) {  // call LIFO
-			errs = this.#execFn(rscs[i]!)
-		}
-		return errs
-	}
-
-	#execFn(fn: Fn, errs?: Error[]): Error[] | undefined {
-		let err
-		try {
-			fn()
-		}
-		catch (e) {
-			if (!errs) errs = []
-			errs.push(errify(e))
-			err = errs
-		}
-		return err
-	}
-
-	_ridAsyncRscs(errs?: Error[]) {
-
-		const { _childs, _asyncRscs: rscs } = this
-		const self = this
-
-		let nWaiting = 0
-		let nDone = 0
-
-		if (_childs) {
-			nWaiting += _childs.size
-			for (const c of _childs.arr_m) {
-				c.cancel()
-				c._on(EV.JOB_DONE, jDone)
-			}
-		}
-
-		if (rscs) {
-			if (Array.isArray(rscs)) {
-				for (const r of rscs) {
-					execR(r)
-				}
-			}
-			else {
-				execR(rscs)
-			}
-		}
-
-		function asyncRscDone(x?: Error) {
-			++nDone
-			if (x) {
-				if (!errs) errs = []
-				errs.push(x)
-			}
-			if (nDone === nWaiting) {
-				self._settle(errs)
-			}
-		}
-
-		function jDone(j: Job) {
-			asyncRscDone(j._state === "DONE_ERR" ? j.val as Error : undefined)
-		}
-
-		function execR(r: AsyncRsc) {
-			++nWaiting
-			if (Symbol.asyncDispose in r) {
-				r[Symbol.asyncDispose]().then(_ => asyncRscDone(), x => asyncRscDone(errify(x)))
-			}
-			else {
-				new Job(false, r)._on(EV.JOB_DONE, jDone)
-			}
-		}
-	}
-
-	// all paths, end up going _ridRscs() -> _settle()
-	// genFnRet()  ->  this.val = yielded.val   (unless _ridRscs fails after)
-	// _cancel()  ->  ECancOK   (unless _ridRscs fails after)
-	// genFnThrew()  ->  first err in Errors
-	// after "using"/finally {}  ->   ECancOK|Errors
-	// bc finally is only ran after job.cancel()
-	// Sooo, within _genFnRet() need to check if it was called after cancellation ??
-	// or does _settle() overwrites?
-
-	// _ridRscs() is a middleware before _settle()
+	// endProtocol() is a middleware before settle()
 
 	// OPTION 1) pass this.val to all middleware functions as (err, val)
 	// so if err !== undefined, settle with err.
-	// OPTION 2)) check in _settle ifECancOKOrErrors()
+	// OPTION 2)) check in settle ifECancOKOrErrors()
 
 
-	// _settle() is only called by _ridSyncRscs() or _ridAsyncRscs()
+	// settle() is only called by _ridSyncRscs() or _ridAsyncRscs()
 	// this.val set by _genFnRet and _cancel() (as hack to put caller.name)
 	// this guy this.val usage is a mess
 	//
-	_settle(errs?: Error[]) {
+	#settle(errs?: Error[]) {
 		const { _state } = this
 		let msg = ""
 
@@ -397,27 +404,11 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		// maybe a special Job class??
 	}
 
-	onEnd(x: OnEnd) {
-		if (Symbol.dispose in x) {
-			this.#addRsc("_syncRscs", x[Symbol.dispose].bind(x))
-		}
-		else if (Symbol.asyncDispose in x) {
-			this.#addRsc("_asyncRscs", x[Symbol.asyncDispose].bind(x))
-		}
-		else if (isGenFn(x)) {
-			this.#addRsc("_asyncRscs", x)  // todo
-		}
-		// () => unknown
-		// () => PromiseLike<unknown>
-		// () => job
-		this.#addRsc("_syncRscs", x)
-	}
-
-	#addRsc<T, K extends keyof this>(k: K, newV: T) {
-		const currV = this[k]
-		if (!currV) (this[k] as T) = newV
+	onEnd(newV: OnEnd) {
+		const currV = this._onEnd
+		if (!currV) this._onEnd = newV
 		else if (Array.isArray(currV)) currV.push(newV)
-		else (this[k] as T[]) = [currV as T, newV]
+		else this._onEnd = [currV, newV]
 	}
 }
 
@@ -568,7 +559,9 @@ function any(pool: Pool<Job>) {
 
 
 
-export const genCtor = (function* () { }).constructor
-function isGenFn(x: unknown): x is GenFn {
-	return x instanceof genCtor
+
+
+function isProm(x: unknown): x is PromiseLike<unknown> {
+	return (x !== null && typeof x === "object" &&
+		"then" in x && typeof x.then === "function")
 }

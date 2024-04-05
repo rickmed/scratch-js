@@ -1,5 +1,3 @@
-import { readFile } from "fs/promises";
+function* hu() {}
 
-readFile("dsada").catch(e => {
-	console.log(e)
-})
+console.log(hu instanceof Function)

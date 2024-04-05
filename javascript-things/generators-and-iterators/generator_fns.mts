@@ -281,34 +281,34 @@ let yielded
 
 
 
-/***  finally  ****************************************************************/
+// /***  finally  ****************************************************************/
 
-const rsc = {
-	[Symbol.dispose]() {
-		console.log("disposing")
-	}
-}
+// const rsc = {
+// 	[Symbol.dispose]() {
+// 		console.log("disposing")
+// 	}
+// }
 
-function* genFn() {
-	using rrr = rsc
-	try {
-		yield 1
-		return true
-	}
-	finally {
-		console.log("finally 1")
-		try {
-			yield 3
-		}
-		finally {
-			console.log("finally 2")
-			return "done finally"
-		}
-	}
-}
+// function* genFn() {
+// 	using rrr = rsc
+// 	try {
+// 		yield 1
+// 		return true
+// 	}
+// 	finally {
+// 		console.log("finally 1")
+// 		try {
+// 			yield 3
+// 		}
+// 		finally {
+// 			console.log("finally 2")
+// 			return "done finally"
+// 		}
+// 	}
+// }
 
-const gen = genFn()
-console.log(yielded = gen.next())
-// nested finally
-console.log(yielded = gen.return(90))   // "finally 1", { value: 3, done: false }
-console.log(yielded = gen.next())  // "finally 2", "disposing", { value: undefined, done: true }
+// const gen = genFn()
+// console.log(yielded = gen.next())
+// // nested finally
+// console.log(yielded = gen.return(90))   // "finally 1", { value: 3, done: false }
+// console.log(yielded = gen.next())  // "finally 2", "disposing", { value: undefined, done: true }

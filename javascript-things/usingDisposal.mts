@@ -3,6 +3,15 @@ import { open as openP, type FileHandle} from "node:fs/promises"
 import { runningJob } from "../ribu/system.mjs"
 import { go } from "../ribu/Job.mjs"
 
+function getRsc() {
+	return {
+		[Symbol.dispose]() {
+			console.log("done")
+		}
+	}
+}
+
+
 
 /***  Ribu Auto-resource usage  ***********************************************/
 
@@ -41,30 +50,51 @@ function* manual(): Generator<Promise<FileHandle>, any, FileHandle> {
 }
 
 
-// onEndFn needs to check for errors. This ok
+/* Ribu Error handling with resource management */
+
+// using .cont
 function* manual2(): Generator<Promise<unknown>, any, FileHandle | Error> {
 	const rsc = yield openP("./path.js")
-	if (rsc instanceof Error) return rsc
-	const x = rsc   // use rsc...
+	if ((e(rsc))) return rsc
+	// GOOD: typescript will complain if onEnd() is above error handling
 	onEnd(() => rsc.close())
+	const x = rsc   // use rsc...
 }
 
-
-// if rsc is error, rsc runs but throws since rsc is not FileHandle
-	// it's ok I guess
-function* manual3(): Generator<Promise<unknown>, any, FileHandle | Error> {
+// using .$ -> GREAT
+function* manual3(): Generator<Promise<unknown>, any, FileHandle> {
 	const rsc = yield openP("./path.js").$
-	//
+	// GOOD: if openP() fails, onEnd() called, so rsc.dispose() is never registered
+	onEnd(rsc)   // onEnd
 
-	onEnd(() => (rsc as FileHandle).close())
-
-	// or
-	onEnd(() => err(rsc) || rsc.close())
 }
 
-function err(x: unknown): x is Error {
+function e(x: unknown): x is Error {
 	return x instanceof Error
 }
+
+
+/* "await using" */
+// if openP fails, it throws and await f.asyncDispose() is called, so:
+	// 1) rsc within asyncDispose() has to check if acquired resource or not
+		// if this.haveRsc = false, asyncDispose() resolves ok immediately if internally
+
+// CONCLUSION: Ribu better bc:
+// 1) No need to check if has rsc
+// 2) Clearer control flow.
+
+async function op() {
+	await using f = await openP("./dummy.txt")
+}
+
+op()
+
+
+
+
+
+
+
 
 
 /***   Ribu auto-unsubscribable from things   *********************************/

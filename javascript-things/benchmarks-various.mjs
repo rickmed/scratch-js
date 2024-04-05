@@ -353,25 +353,39 @@
 // 	// no gain in putting all keys in heterogeneous array
 
 
-/***  Cost of creating a js fn closure  ***************************************/
-// add firs 1_000_000 numbers
-const benchIterations = 1_000_000
+// /***  Cost of creating a js fn closure  ***************************************/
 
-let now = performance.now()
-let count = 0
-for (let i = 0; i <= benchIterations; i++) {
-	count++
-}
-console.log(performance.now() - now, "without closure")
+// // add first 1_000_000 numbers
+// const benchIterations = 1_000_000
 
-now = performance.now()
-let fn
-for (let i = 0; i <= benchIterations; i++) {
-	fn = function () {
-		count++
-	}
-	fn()
-}
-console.log(performance.now() - now, "fn closure")
-// CONCLUSION:
-	// fn closures: ~15ms, ie are fast.
+// let now = performance.now()
+// let count = 0
+// for (let i = 0; i <= benchIterations; i++) {
+// 	count++
+// }
+// console.log(performance.now() - now, "without closure")
+
+// now = performance.now()
+// let fn
+// for (let i = 0; i <= benchIterations; i++) {
+// 	fn = function () {
+// 		count++
+// 	}
+// 	fn()
+// }
+// console.log(performance.now() - now, "fn closure")
+// // CONCLUSION:
+// 	// fn closures: ~15ms, ie are fast.
+
+
+// /***  Cost pf creating Error object  ******************************************/
+
+// const benchIterations = 1_000_000
+
+// let now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	const err = Error()
+// }
+// console.log(performance.now() - now)
+
+// // VERY SLOW: 2600ms
