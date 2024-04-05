@@ -1,3 +1,5 @@
-function* hu() {}
+import { readFile } from "fs";
 
-console.log(hu instanceof Function)
+readFile("./dumm.txt", "utf-8", (err, res) => {
+	console.log(err)
+})

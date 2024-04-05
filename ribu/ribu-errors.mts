@@ -1,43 +1,51 @@
-import { type Job } from "./Job.mjs"
+import { Job } from "./Job.mjs"
 
-export const RIBU_E = Symbol("RIBU_E")
+type BaseE<Name extends string = string> = Error & {
+	readonly name: Name
+}
+export function BaseE<Name extends string = string>(name: Name, msg = ""): BaseE<Name> {
+	return {
+		name: name,
+		message: msg
+	}
+}
 
 type E<Name extends string = string> = Error & {
-	[RIBU_E]: symbol
-	name: Name
-	jobName: string
+	readonly name: Name
+	readonly _err$: true
+	readonly _jobName$: string
 }
-
-export function E<Name extends string = string>(name: Name, jName: string, msg = "", symb = RIBU_E): E<Name> {
-	let err = Error(msg) as E<Name>
-	err[RIBU_E] = symb
-	err.name = name
-	err.jobName = jName
-	return err
+export function E<Name extends string = string>(name: Name, msg = "", jName = ""): E<Name> {
+	return {
+		name: name,
+		message: msg,
+		_err$: true,
+		_jobName$: jName
+	}
 }
-
-
-export const isErrors = Symbol("Errors")
-
-export type Errors = E<"Errors"> & {
-	errors: Error[]
-}
-
-export function Errors(errs: Error[], jName: string, msg: string): Errors {
-	let err = E("Errors", jName, msg, isErrors) as Errors
-	err.errors = errs
-	return err
-}
-
-
-
-export const isECancOK = Symbol("ECancOK")
 
 export type ECancOK = ReturnType<typeof ECancOK>
-
-export function ECancOK(jName: string, msg: string) {
-	return E("CancOK", jName, msg, isECancOK)
+export function ECancOK(msg: string, jName: string) {
+	return E("CancOK", msg, jName)
 }
+
+
+export type Errors = E<"Errors"> & {
+	readonly errors: Array<Error | E>
+}
+export function Errors(errs: Array<Error | E>, msg: string, jName: string): Errors {
+	return {
+		name: "Errors",
+		message: msg,
+		_err$: true,
+		_jobName$: jName,
+		errors: errs
+	}
+}
+
+
+
+
 
 
 
@@ -50,12 +58,12 @@ export function ExtendError<Name extends string = string>(name: Name, ogErr: Err
 /****  Helpers check if error  ***********************/
 
 export function isE(x: unknown): x is E {
-	return x !== null && typeof x === "object" && RIBU_E in x
+	return x !== null && typeof x === "object" && IS_RIBU_E in x
 }
 
 export function jobFailed(job: Job): boolean {
 	const {val} = job
-	return isE(val) && val[RIBU_E] === isErrors
+	return isE(val) && val[IS_RIBU_E] === isErrors
 }
 
 export function e(x: unknown): x is Error {
@@ -95,10 +103,12 @@ function fn(x: string) {
 		return E("No File")
 	}
 	if (x === "three") {
-		return Errors([Error("buuu")])
-		// return Error("WHAT")
-		// return AggregateError("WHAT")
-		// return new TypeError('dsa')
+		// return Errors([Error("buuu")])
+		return Error("One")
+	}
+	if (x === "three") {
+		// return Errors([Error("buuu")])
+		return Error("Two")
 	}
 	if (x === "happyPath") {
 		return "hi"
@@ -109,8 +119,8 @@ function fn(x: string) {
 function x() {
 	let res = fn("dsad")
 
-	if (e(res)) {   // "if (res instanceof Error)"
-		return res
+	if (res instanceof Error) {   // "if (res instanceof Error)"
+		// res.name
 		// recover,
 		// extend/map Error to App Domain (see above) or procotol (404, grpc...)...
 		// log

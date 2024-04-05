@@ -378,14 +378,24 @@
 // 	// fn closures: ~15ms, ie are fast.
 
 
-// /***  Cost pf creating Error object  ******************************************/
+// /***  Cost of creating Error() object  ******************************************/
+// // Error() is VERY slow
 
 // const benchIterations = 1_000_000
 
+// // POJO
 // let now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	const err = {name: "hi", _tag: 32, _otherTag: true}
+// }
+// console.log(performance.now() - now, "POJO")
+
+
+// // Error()
+// now = performance.now()
 // for (let i = 0; i <= benchIterations; i++) {
 // 	const err = Error()
 // }
-// console.log(performance.now() - now)
+// console.log(performance.now() - now, "Error()")
 
-// // VERY SLOW: 2600ms
+// // POJO is almost 500x faster! (4ms vs 4000ms)
