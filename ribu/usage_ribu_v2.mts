@@ -8,7 +8,7 @@ function* sequential() {
 
 	// OPTION 1: res :: GenFnReturns | E<CancOK> | E<RibuErrors> (contains Error[])
 		// if you want to get the res, you HAVE to handle if (err(res)),
-	const val = yield* job.cont
+	const val = yield* job.cont   // 
 	if (err(val)) {
 		// return other Error, map, whatever.
 	}

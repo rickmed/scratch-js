@@ -1,16 +1,22 @@
 import { ArrSet, Events } from "./data-structures.mjs"
-import { ECancOK, Errors, isE } from "./ribu-errors.mjs"
-import { runningJob, sys } from "./system.mjs"
+import { E, ECancOK, Errors, isE } from "./ribu-errors.mjs"
+import { runningJob, sys, theIterator } from "./system.mjs"
 
 export const GenFn = (function* () { }).constructor
+
 function isGenFn(x: unknown): x is GenFn {
 	return x instanceof GenFn
 }
 
+const errify = (x: unknown) => x instanceof Error ? x : E("RibuErr", JSON.stringify(x))
+
+
 /* observe-resume model:
+
 	- Things subscribe to job._on(EV.JOB_DONE, cb) event when want to be notified
-	when it's done.
-	- Jobs observing other jobs (yield*) insert (jobDone) => observer._resume()
+	when observingJob is done.
+
+	- Jobs observing other jobs (yield*) insert cb :: (jobDone) => observer._resume()
 		- There's no way for user to stop observing a job.
 			- When yield* job.cancel() is called and additional observer is added,
 			and the other observers (yield* job.$) are resumed when job settles
@@ -24,19 +30,13 @@ function isGenFn(x: unknown): x is GenFn {
 	- Channels:
 		- Removing a job from within a queue is expensive, so channel checks
 		if job === DONE and skips it (removed from queue and not resumed)
-
-
-- Maybe optimize sleep()
-- Also, can only use one resource, if need +1, wrap them in one
 */
 
-/* End and Cancel Protocols
-
-
-
+/* Internals:
+	- [genFnReturned, genThrew, cancel...] -> endProtocol() -> _#Settle()
+	- endProtocol() is always called bc there may be activeChilds, timeout, onEnd...
 */
 
-const errify = (x: unknown) => x instanceof Error ? x : Error(JSON.stringify(x))
 
 export function go<Args extends unknown[], T>(genFn: GenFn<T, Args>, ...args: Args) {
 	return new Job<GenFnRet<typeof genFn>, Errors | ECancOK>(true, genFn as GenFn, args)
@@ -82,9 +82,6 @@ const tryFnFailed = Symbol("f")
 /* Job class */
 export class Job<Ret = unknown, Errs = unknown> extends Events {
 
-	// todo: is observed is done with ECancOK and this._next = "$", continue
-	// all other errors, fail this job
-
 	val: Ret | Errs = "$dummy" as (Ret | Errs)
 	_gen: Gen
 	_name: string
@@ -114,39 +111,25 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		this._parent = parent
 	}
 
-	// yield* (Symbol.Iterator) can only be called if .rec|.$ is called first.
-	// ie, job shouldn't have this method, but want to avoid create/return a different obj
-	[Symbol.iterator](): TheIterator<Ret> {
-		const { _state: _status, _next } = this
-		if (!_next) {
-			// todo: end caller job (bc user needs to call .$ or .if before yield*)
-		}
-		const runningJ = runningJob()
 
-		// if this job is alredy resolved, resume caller with the settled value
-		if (_status === "DONE") {
-			runningJ._setResume(this.val)
-		}
-		else {
-			runningJ._setPark()
-			this._addObserver(runningJ)
-		}
-		return theIterator
-	}
+/*
 
-	// Need to configure somehow how the caller/observer needs to be resumed;
-	// if called .cont (resume with callee.val) or .$ (settle with callee.val).
-	// Since a job can only be parked in one place at a time, the configuration
-	// can be placed at the caller's obj so caller.resume() checks its ._next
-	// when it is called by observed/this job
-	get cont(): Job<Ret /* todo: minus Errors + [Symbol.Iterator]() */> {
+Need to configure somehow how the caller/observer needs to be resumed;
+	- if called .cont (resume with observing.val) or .$ (settle with callee.val).
+	Since a job can only be parked in one place at a time, the configuration
+	can be placed at the caller's obj so caller.resume() checks its ._next
+	when it is called by observed/this job
+*/
+
+	// cont
+	get cont() {
 		runningJob()._next = "cont"
-		return this
+		return JobIterable as JobIterable<Ret>
 	}
 
 	get $() {
 		runningJob()._next = "$"
-		return this
+		return JobIterable as JobIterable<Ret>
 	}
 
 	get orEnd() {
@@ -154,6 +137,16 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 	}
 
 	// todo: ._next = undefined when done resuming
+	// if the job I'm observing finishes with DONE_ERR:
+		// need to check if this.const or .$
+/*
+Need to receive the doneJob I'm observing to see if it ended at "DONE_ERR" or "DONE_OK"
+	to see if I need to resume or settle.
+
+	
+*/
+
+
 	_resume(IOmsg?: unknown): void {
 
 		// todo: is this necessary? what IO is _resuming when job is done?
@@ -179,7 +172,7 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 			sys.stack.pop()
 
 			if (yielded.done) {
-				this._genFnDone(yielded.value as Ret)
+				this.#genFnReturned(yielded.value as Ret)
 			}
 
 			// ?? done === false, ie, park
@@ -187,7 +180,7 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		}
 	}
 
-	_genFnDone(yieldVal: Ret) {
+	#genFnReturned(yieldVal: Ret) {
 		this.val = yieldVal
 		this._state = "GENFN_DONE"
 		if (this._childs?.size) this._waitChilds()
@@ -211,7 +204,7 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		function cb(childDone: Job) {
 			++nCsDone
 			if (childDone._state === "DONE_ERR") {
-				thisJ.#deleteWaitChildsCBs()
+				thisJ.#offWaitChildsCBs()
 				thisJ.#endProtocol([childDone.val] as Error[])
 				return
 			}
@@ -222,7 +215,7 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 
 	}
 
-	#deleteWaitChildsCBs() {
+	#offWaitChildsCBs() {
 		const cs = this._childs!
 		const csL = cs.size
 		for (let i = 0; i < csL; i++) {
@@ -231,13 +224,39 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		}
 	}
 
+	cancel() {
+		// if (state === CANCEL | done ) add new observer; return
+		// if DONE, resolve caller immediately
+
+		// todo: check these lines
+		const caller = runningJob()
+		this._on(EV.JOB_DONE, (j: Job) => {
+			caller._resume()
+		})
+
+
+		// reuse this.val since it won't be anything returned by genFn
+		this.val = caller._name as Ret
+
+		const { _state, _childs } = this
+
+		// todo: need to change state in ridRscs so && _childs is superfluous
+		if (_state === "WAIT_CHILDS" && _childs) {
+			this.#offWaitChildsCBs()
+		}
+
+		this._state = "CANCEL"
+		this.#endProtocol()
+		return this
+	}
+
 	#endProtocol(errs?: Error[]) {
 		const { _childs: cs, _sleepTO, _onEnd: ends } = this
 
 		if (_sleepTO) clearTimeout(_sleepTO)
 
 		if (!(ends || (cs && cs.size > 0))) {
-			this.#settle(errs)
+			this.#_settle(errs)
 			return
 		}
 
@@ -311,7 +330,7 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 				errs.push(x)
 			}
 			if (nAsyncDone === nAsyncWaiting) {
-				self.#settle(errs)
+				self.#_settle(errs)
 			}
 		}
 
@@ -320,79 +339,29 @@ export class Job<Ret = unknown, Errs = unknown> extends Events {
 		}
 	}
 
-	cancel() {
-		// if (state === CANCEL | done ) add new observer; return
-		// if DONE, resolve caller immediately
-
-		// todo: check these lines
-		const caller = runningJob()
-		this._on(EV.JOB_DONE, (j: Job) => {
-			caller._resume()
-		})
-
-
-		// reuse this.val since it won't be anything returned by genFn
-		this.val = caller._name as Ret
-
-		const { _state, _childs } = this
-
-		// todo: need to change state in ridRscs so && _childs is superfluous
-		if (_state === "WAIT_CHILDS" && _childs) {
-			this.#deleteWaitChildsCBs()
-		}
-
-		this._state = "CANCEL"
-		this.#endProtocol()
-		return this
-	}
-
-	// all paths, end up going endProtocol() -> settle()
-	// endProtocol() need to always be called bc there may be activeChilds, timeout, onEnd...
-
-		// genFnRet()  ->  this.val = yielded.val   (unless endProtocol fails after)
-		// _cancel()  ->  ECancOK   (unless endProtocol fails after)
-		// genFnThrew()  ->  first err in Errors
-		// Sooo, within _genFnRet() need to check if it was called after cancellation ??
-		// or does settle() overwrites?
-
-	// endProtocol() is a middleware before settle()
-
-	// OPTION 1) pass this.val to all middleware functions as (err, val)
-	// so if err !== undefined, settle with err.
-	// OPTION 2)) check in settle ifECancOKOrErrors()
-
-
-	// settle() is only called by _ridSyncRscs() or _ridAsyncRscs()
-	// this.val set by _genFnRet and _cancel() (as hack to put caller.name)
-	// this guy this.val usage is a mess
-	//
-	#settle(errs?: Error[]) {
+	#_settle(errs?: Error[]) {
 		const { _state } = this
-		let msg = ""
-
-		if (_state === "CANCEL") {
-			msg = "cancelled by" + this.val as string
-		}
-
 		const jName = this._name
+		// this.val as job.name is reused/hack since this.val won't be used
+			// by genFn's return val
+		const msg = _state === "CANCEL" ? `Cancelled by ${this.val}` : ""
 
 		if (errs) {
-			this.val = Errors(errs, jName, msg) as Ret
+			this.val = new Errors(errs, jName, msg) as Ret
 			this._state = "DONE_ERR"
 		}
 		else {
 			if (_state === "CANCEL") {
 				this.val = ECancOK(jName, msg) as Ret
 			}
-
-			// if genFn returns ribu error, add .jobName
-			// BUG: _state may be mutated by other stage
-			if (_state === "GENFN_DONE" && isE(this.val)) {
-				this.val.jobName = jName
+			if (isE(this.val) && this.val._op$ !== "") {
+				// @ts-ignore ._op$ being readonly
+				this.val._op$ = jName
 			}
 
 			this._state = "DONE_OK"
 		}
+
 		this._emit(EV.JOB_DONE_WAITCHILDS, this)
 		this._emit(EV.JOB_DONE, this)
 		this._parent?._childs!.delete(this)
@@ -417,20 +386,47 @@ function onEnd(x: OnEnd) {
 }
 
 
-function theIteratorFn(this: Job) {
-	const runningJ = runningJob()
-	const { _state: _status } = this
+/* Job Iterables */
 
-	// if the job is alredy resolved, resume calling job with the resolved value
-	if (_status === "DONE") {
-		runningJ._setResume(this.val)
-	}
-	else {
-		runningJ._setPark()
-		this._addObserver(runningJ)
-	}
-	return theIterator
+type JobIterable<V> = {
+	[Symbol.iterator](): Iterator<unknown, V>
 }
+
+type TheIterator<V> = Iterator<unknown, V>
+
+const JobIterable = {
+	[Symbol.iterator]() {
+		return theIterator
+	}
+}
+
+
+	// yield* (Symbol.Iterator) can only be called if .rec|.$ is called first.
+	// ie, job shouldn't have this method beforehand,
+		// but want to avoid create/return a different obj
+		[Symbol.iterator](): TheIterator<Ret> {
+			const { _state, _next } = this
+			if (!_next) {
+				// todo: end caller job (bc user needs to call .$ or .if before yield*)
+			}
+			const runningJ = runningJob()
+
+			// somewhere here:
+			// job._on(EV.JOB_DONE, doneJob => {
+
+			// })
+
+			// if this job is alredy resolved, resume caller with the settled value
+			if (_state === "DONE") {
+				runningJ._setResume(this.val)
+			}
+			else {
+				runningJ._setPark()
+				this._addObserver(runningJ)
+			}
+			return theIterator
+		}
+
 
 
 /* ** HELPER FNs ***********************************/

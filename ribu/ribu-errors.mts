@@ -1,140 +1,159 @@
 import { Job } from "./Job.mjs"
+import { sleep } from "./timers.mjs"
 
-type BaseE<Name extends string = string> = Error & {
-	readonly name: Name
-}
-export function BaseE<Name extends string = string>(name: Name, msg = ""): BaseE<Name> {
-	return {
-		name: name,
-		message: msg
+/*
+_op$: the name of the job's generator function or the name of the function if
+	the user wants to return E objects in sync functions.
+- If something threw and it's not ::Error, then it's wapped in ::BaseE.
+
+- User can extend E object with additional properties as Nodejs extends with
+	{
+		errno: -2,
+		code: 'ENOENT',
+		syscall: 'open',
+		path: './dumm.txt',
+	}
+*/
+
+class RibuE<Name extends string = string> implements Error {
+
+	constructor(
+		readonly name: Name,
+		readonly _op$: string,
+		readonly message: string,
+		readonly cause?: RibuE,
+	) {}
+
+	E<Name extends string>(name: Name, op = "", msg = "") {
+		return E(name, op, msg, this)
 	}
 }
 
-type E<Name extends string = string> = Error & {
-	readonly name: Name
-	readonly _err$: true
-	readonly _jobName$: string
+Object.setPrototypeOf(RibuE.prototype, Error.prototype)
+
+
+type E<Name extends string = string> = Error & RibuE<Name>
+
+export function E<Name extends string>(name: Name, op = "", msg = "", cause?: RibuE): E<Name> {
+	return new RibuE<Name>(name, op, msg, cause)
 }
-export function E<Name extends string = string>(name: Name, msg = "", jName = ""): E<Name> {
-	return {
-		name: name,
-		message: msg,
-		_err$: true,
-		_jobName$: jName
-	}
-}
+
 
 export type ECancOK = ReturnType<typeof ECancOK>
-export function ECancOK(msg: string, jName: string) {
-	return E("CancOK", msg, jName)
+
+export function ECancOK(jName: string, msg: string) {
+	return E("CancOK", jName, msg)
 }
 
 
-export type Errors = E<"Errors"> & {
-	readonly errors: Array<Error | E>
-}
-export function Errors(errs: Array<Error | E>, msg: string, jName: string): Errors {
-	return {
-		name: "Errors",
-		message: msg,
-		_err$: true,
-		_jobName$: jName,
-		errors: errs
+export class Errors extends RibuE<"Errors"> {
+	constructor(readonly errs: Error[], jName: string, msg: string) {
+		super("Errors", jName, msg)
 	}
 }
 
 
-
-
-
-
-
-export function ExtendError<Name extends string = string>(name: Name, ogErr: Error): E<Name> {
-	ogErr.name = name
-	return ogErr as E<Name>
+export function isE(x: unknown) {
+	return x instanceof RibuE
 }
 
 
-/****  Helpers check if error  ***********************/
+type EE = RibuE<string>
 
-export function isE(x: unknown): x is E {
-	return x !== null && typeof x === "object" && IS_RIBU_E in x
+export function errIsNot<X, T extends Extract<X, EE>["name"]>(x: X, name: T): x is Extract<X, EE> & Exclude<X, RibuE<T>> {
+	return isE(x) && x.name !== name
 }
 
-export function jobFailed(job: Job): boolean {
-	const {val} = job
-	return isE(val) && val[IS_RIBU_E] === isErrors
+export function errIs<X, T extends Extract<X, EE>['name']>(x: X, name: T): x is Extract<X, RibuE<T>> {
+	return isE(x) && x.name === name
 }
-
-export function e(x: unknown): x is Error {
-	return x instanceof Error
-}
-
-export function errIsNot<X, T extends Extract<X, E>["name"]>(x: X, name: T): x is Extract<X, E> & Exclude<X, E<T>> {
-	return e(x) && x.name !== name
-}
-
-export function errIs<X, T extends Extract<X, E>['name']>(x: X, name: T): x is Extract<X, E<T>> {
-	return e(x) && x.name === name
-}
-
-
-/****  Extend Ribu Error with Application Domain Error  ***********************/
-
-type AppErr<Name extends string> = {level: number} & E<Name>
-function AppErr<Name extends string>(level: number, ogErr: E<Name>): AppErr<Name> {
-	const err = ogErr as AppErr<Name>
-	err.level = level
-	return err
-}
-
-// create one:
-const appErr1 = AppErr(4, E("CANCOK"))
-
 
 
 /***  Errors usage  ***********************************************************/
 
-function fn(x: string) {
-	if (x === "one") {
-		return E("Timeout")
+
+const theErr = {
+	name: "FileNotFound",
+	message: "",
+	_op$: "getIngredients",
+	cause: {
+		message: "ENOENT: no such file or directory, open './dumm.txt'",
+		name: "Error",
+		errno: -2,
+		code: 'ENOENT',
+		syscall: 'open',
+		path: './dumm.txt',
+		cause: undefined
 	}
-	if (x === "two") {
-		return E("No File")
-	}
-	if (x === "three") {
-		// return Errors([Error("buuu")])
-		return Error("One")
-	}
-	if (x === "three") {
-		// return Errors([Error("buuu")])
-		return Error("Two")
-	}
-	if (x === "happyPath") {
-		return "hi"
-	}
-	return 32
 }
 
-function x() {
-	let res = fn("dsad")
 
-	if (res instanceof Error) {   // "if (res instanceof Error)"
-		// res.name
-		// recover,
-		// extend/map Error to App Domain (see above) or procotol (404, grpc...)...
-		// log
-	}
 
-	const x = res  // x is "hi" | {file: number}
+
+function fetchFactory(part: string) {
+	let op = fetchFactory.name
+	const cond = Math.random()
+	const res =
+		cond < 0.3 ? E("NetworkFailed", op, part) :
+		cond < 0.8 ? E("NoPartsFound", op, part) :
+		{ part }
+	return res
 }
 
-function y() {
-	let res = fn("dsad")
+function makeHelmet() {
+	const res = fetchFactory("helmet")
+	if (isE(res)) return res.E("BuildHelmet", makeHelmet.name)
+	return { helmet: res.part }
+}
 
-	if (errIs(res, "No File")) {
-		return res
+
+function makeBody() {
+	const res = fetchFactory("body")
+	if (res instanceof Error) return res.E("BuildBody", makeBody.name)
+	return { body: res.part }
+}
+
+function makeIronManSuit() {
+	const helmet = makeHelmet()
+	if (isE(helmet)) return helmet
+	const body = makeBody()
+	if (isE(body)) return body
+	return [helmet, body]
+}
+
+function httpHandler(req, res) {
+	const suit = makeIronManSuit()
+	if (isE(suit)) {
+		res.statusCode = 500
+		return res.end()
 	}
+	const ok = suit
+}
 
-	const x = res  // x1 is E<Timeout> | AggregateError | "hi" | {file: number}
+
+/* Async Usage */
+
+function* asyncHelmet() {
+	yield sleep(4)
+	return makeHelmet()
+}
+
+function* asyncBody() {
+	yield sleep(4)
+	return makeBody()
+}
+
+// function* makeSuit() {
+// 	const helmet = yield* asyncHelmet().$
+// 	const body = yield* asyncBody().$
+// 	return [helmet, body]
+// }
+
+function* makeSuit() {
+	const helmet = yield* asyncHelmet()
+	// if op is not set in E, ribu will set it for you (no static type check though)
+	if (isE(helmet)) return helmet.E("MakeSuit")
+	const body = yield* asyncBody()
+	if (isE(body)) return body.E("MakeSuit")
+	return [helmet, body]
 }

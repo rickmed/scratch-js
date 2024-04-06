@@ -46,3 +46,8 @@ PP has:
 /*********************************/
 // Object.__proto__ -> NativeCode
 // [].__proto__ === Array.prototype
+
+
+/* instanceof */
+
+

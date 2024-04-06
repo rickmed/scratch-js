@@ -1,5 +1,9 @@
-async function hi() {
-	throw "dasd"
+class E {
+	static E() {
+		return 4234
+	}
 }
 
-hi().then(x => x, x => console.log(x))
+const {E: EE} = E
+
+console.log(EE())
