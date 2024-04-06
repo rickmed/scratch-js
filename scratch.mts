@@ -1,9 +1,7 @@
-class E {
-	static E() {
-		return 4234
-	}
-}
+const x: number = "f"
 
-const {E: EE} = E
+const  { promise, resolve, reject } = Promise.withResolvers<number>()
 
-console.log(EE())
+resolve(4)
+
+promise.then(res => {})

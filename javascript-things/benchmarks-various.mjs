@@ -2,6 +2,8 @@
 	A server doing 10k req/sec -> process a req in 10 µs
 */
 
+import { array } from "superstruct"
+
 
 // /* --- Add first 1_000_000 numbers calling method  --- */
 
@@ -353,6 +355,33 @@
 // 	// no gain in putting all keys in heterogeneous array
 
 
+// // /*  ---  Membership Set.has vs Array.includes ---------------------------- */
+// // ~same with ~100-1000 objects
+
+// const benchIterations = 1_000_000
+// const N_THINGS = 1_000
+// const arr = Array.from({length: N_THINGS}, (_, i) => i)
+// const middleItem = Math.round(N_THINGS / 2)
+// const lastItem = N_THINGS - 1
+
+// let set = new Set(arr)  // benchmark includes creation of data structure
+// let now = performance.now()
+
+// for (let i = 0; i <= benchIterations; i++) {
+// 	set.has(middleItem)
+// }
+// console.log(performance.now() - now, "set.has(middle item)")
+
+
+// now = performance.now()
+
+// for (let i = 0; i <= benchIterations; i++) {
+// 	arr.includes(middleItem)
+// }
+// console.log(performance.now() - now, "array.includes(middle item)")
+
+
+
 // /***  Cost of creating a js fn closure  ***************************************/
 
 // // add first 1_000_000 numbers
@@ -399,3 +428,124 @@
 // console.log(performance.now() - now, "Error()")
 
 // // POJO is almost 500x faster! (4ms vs 4000ms)
+
+
+// /***  instanceof vs key in x vs string in key vs obj unknown  *****************/
+// // all are really fast (low ms), but instanceof ~2x slower
+
+// let now
+// const benchIterations = 1_000_000
+
+// class TheObj {
+// 	constructor() {
+// 		 this.t = 'mesh';
+// 	}
+// }
+
+// const obj = new TheObj()
+// let count = 0
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	if (obj instanceof Object) count = i
+// }
+// console.log(performance.now() - now, "instanceof")
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	if (obj.t === "mesh") count = i
+// }
+// console.log(performance.now() - now, "string in key")
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	if (obj.t === "d" || obj.t === "mesh") count = i
+// }
+// console.log(performance.now() - now, "double string in key")
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	if ("t" in obj) count = i
+// }
+// console.log(performance.now() - now, "key in")
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	if (obj !== null && typeof obj === "object" && "t" in obj) count = i
+// }
+// console.log(performance.now() - now, "thing unknown")
+
+
+// /***  Private methods: # syntax vs symbol  *****************/
+
+// let now
+// const benchIterations = 1_000_000
+
+// // # syntax
+// class SomeObj {
+// 	run(x) {
+// 		return this.#priv(x)
+// 	}
+// 	#priv(x) {
+// 		return x
+// 	}
+// }
+
+// const obj = new SomeObj()
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	obj.run(i)
+// }
+// console.log(performance.now() - now, "# syntax")
+
+// // symbol
+// const priv = Symbol()
+// class SomeObj2 {
+// 	run(x) {
+// 		return this[priv](x)
+// 	}
+// 	[priv](x) {
+// 		return x
+// 	}
+// }
+
+// const obj2 = new SomeObj2()
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	obj2.run(i)
+// }
+// console.log(performance.now() - now, "symbol")
+
+
+
+// /***  Check type of thing; instanceof vs Object.prototype.toString.call(x) vs .constructor  *****************/
+// // .constructor is 1x, instanceof is 2x, toString is 20x slower
+
+// let now
+// const benchIterations = 1_000_000
+
+// // instanceof Map
+// const m = new Map()
+
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	(m instanceof Map)
+// }
+// console.log(performance.now() - now, "instanceof")
+
+// // Object.prototype.toString.call(x)
+// now = performance.now()
+// const toStr = Object.prototype.toString
+// for (let i = 0; i <= benchIterations; i++) {
+// 	(toStr.call(m) === "[object Map]")
+// }
+// console.log(performance.now() - now, "Object.toString()")
+
+// // .constructor
+// now = performance.now()
+// for (let i = 0; i <= benchIterations; i++) {
+// 	(m?.constructor === Map)
+// }
+// console.log(performance.now() - now, ".constructor")

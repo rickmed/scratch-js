@@ -400,8 +400,10 @@ function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => {prc, 
 		}
 
 		yield* jobs.rec  // reports when a jobs ends
+
 		// But since tepui jobs are meant to be ran forever until cancelled/fails...
 			// It means that a job did not complete. Either way...
+
 		yield* jobs.cancel().$
 		parentDom.replaceChildren()  // clears children
 		const restoreCh = Ch()

@@ -1,7 +1,7 @@
 import { sleep } from "effect/Effect"
 import dns from "node:dns/promises"
 import net from "node:net"
-import {go, Job, childs as myJobs, pool, Ch} from "ribu"
+import {go, type Job, cancel, childs as myJobs, pool as Pool, Ch} from "ribu"
 import { err, E_, wait, errIs } from "./ribu-errors.mjs"
 import { Socket } from "node:net"
 import { fail } from "node:assert"
@@ -14,19 +14,19 @@ import { count } from "node:console"
 		- and return the socket
 		- if all attempts fail, return an Error.
 */
-
-// DONE
-function* happyEB(hostName: string, port: number, delay: number = 300) {
+function* happyEB_og(hostName: string, port: number, delay: number = 300) {
 
 	const addrs: string[] = yield* dns.resolve4(hostName)
-	if (addrs.length === 0) return Error('DNS: no addresses to connect')
+	if (addrs.length === 0) {
+		return Error('DNS: no addresses to connect')
+	}
 
-	const fail = Ch()
-	const connectJobs = pool(go(connect, addrs.shift()!))
+	const fails = new Ev()
+	const connectJobs = Pool(go(connect, addrs.shift()!))
 
 	go(function* () {
 		for (;;) {
-			yield* Timeout.race(delay, fail)  // can race Ch or other prcS
+			yield fails.timeout(delay)
 			if (addrs.length > 0) connectJobs.go(connect, addrs.shift()!)
 			else return
 		}
@@ -38,30 +38,142 @@ function* happyEB(hostName: string, port: number, delay: number = 300) {
 			yield* myJobs().cancel().$
 			return val
 		}
-		yield* fail.put()
+		fails.emit()
 	}
 
 	return Error("All attempted connections failed")
 }
 
 
-function pool(jobs: Job[]) {
-	let count = jobs.length   // ._childs = jobs
-	const jobDoneCh = Ch()
-	for (const job of jobs) {
-		job.onDone(j => {
-			--count
-			jobDoneCh.putAsync(j)
+class Ev<CB_Aarg = unknown> {
+
+	static Timeout = Symbol("to")
+
+	waitingJob!: Job
+	_timeout?: NodeJS.Timeout
+
+	emit(val?: CB_Aarg) {
+		if (this._timeout) {
+			clearTimeout(this._timeout)
+		}
+		this.waitingJob._resume(val)
+	}
+
+	timeout(ms: number) {
+		const job = runningJob()
+		this._timeout = setTimeout(() => {
+			job._resume(Ev.Timeout)
+		}, ms)
+	}
+
+	get wait(): typeof PARKED {
+		this.waitingJob = runningJob()
+		return PARKED
+	}
+}
+
+
+// DONE
+	// need a pool to:
+		// cancel() rest on success
+		// receive any of them
+	// difference from allOneFail() usage is that jobs are added dynamically
+
+	// Pool
+		// subscribe to passed jobs in constructor immediately
+function* happyEB(hostName: string, port: number, delay = 300) {
+
+	const addrs: string[] = yield* dns.resolve4(hostName)
+	if (addrs.length === 0) {
+		return Error('DNS: no addresses to connect')
+	}
+
+	const fail = Ch()
+	const connectJobs = new Pool(go(connect, addrs.shift()!))
+
+	go(function* launchOnFailOrDelay() {
+		for (;;) {
+			yield* Timeout.race(delay, fail)  // can race Ch or other prcS
+			if (addrs.length > 0) {
+				connectJobs.go(connect, addrs.shift()!)
+			}
+			else return
+		}
+	})
+
+	while (connectJobs.count) {
+		const job: Job = yield connectJobs.rec
+		if (job.val instanceof Socket) {
+			yield cancel(inFlight)
+			return job.val
+		}
+		yield* fail.put()
+	}
+
+	return Error("All attempted connections failed")
+}
+
+class Pool<Jobs> {
+
+	inFlight = 0
+	waitingJob!: Job
+
+	constructor(jobs: Job[]) {
+		this.inFlight = jobs.length
+		for (const job of jobs) {
+			job.onDone(doneJob => {
+				this.waitingJob._resume(doneJob.val)
+			})
+		}
+	}
+
+	get count() {
+		return this.inFlight
+	}
+
+	get rec() {
+		this.waitingJob = runningJob()
+		return PARK
+	}
+
+	add(job: Job) {
+		job.onDone(doneJob => {
+			this.waitingJob._resume(doneJob.val)
 		})
 	}
 
-	function go(...args) {
-		++count
-		go(...args)
-	}
-
-	return {count, rec: jobDoneCh.rec, go}
+	// if I want go(), I need a reference to an array of Jobs to add/delete
+		// could also be useful for long running jobs who add/remove jobs dynamically
 }
+
+
+
+// who is this job child of??
+function connect(addrs: string) {
+	const socket = new net.Socket()
+	const job = Job()
+
+	job.onEnd(() => socket.destroy())
+
+	socket.on("error", e => {
+		job.resolve(e)
+		// or
+		job.reject(e)  // guarantees that prc resolves with Error (ie, wraps e if not instance of Error)
+	})
+
+	socket.on("connect", () => {
+		job.resolve(socket)
+	})
+
+	socket.connect(443, addrs)
+	return job
+}
+
+
+
+
+
+
 
 
 
@@ -76,11 +188,11 @@ function* happyEB_2(hostName: string, port: number, delay: number = 300) {
 	const addrs: string[] = yield* dns.resolve4(hostName)
 	if (addrs.length === 0) return Error('DNS: no addresses to connect')
 
-	const attempts = pool(go(attempt, "args"))
+	const attempts = Pool(go(attempt, "args"))
 	attempts.go(attempt, "args")  // typed
 
 	// other pool
-	const connectJobs = pool<typeof connect>()
+	const connectJobs = Pool<typeof connect>()
 	// allPools() return a Pool<any>, ie, only useful to cancel everything.
 	yield* myJobs().cancel().$
 
@@ -102,25 +214,4 @@ function* happyEB_2(hostName: string, port: number, delay: number = 300) {
 			attempts.go(attempt, addrs.shift()!)
 		}
 	}
-}
-
-// who is this job child of??
-function connect(addrs: string) {
-	const socket = new net.Socket()
-	const job = Job()
-
-	job.onEnd(() => socket.destroy())
-
-	socket.on("error", e => {
-		job.resolve(e)
-		// or
-		job.reject(e)  // guarantees that prc resolves with Error (ie, wraps e if not instance of Error)
-	})
-
-	socket.on("connect", () => {
-		job.resolve(socket)
-	})
-
-	socket.connect(443, addrs)
-	return job
 }
