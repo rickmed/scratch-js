@@ -103,7 +103,7 @@ type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 function cbToJob<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
-	const job = Job<ENotFound | EPerm>()
+	const job = newJob<string, ENotFound | EPerm>()
 
 	function cb(err, data) {
 		if (err) {
@@ -166,8 +166,6 @@ type Fn<Args extends unknown[]> =
 
 
 
-
-
 /*** WebSockets ***
 What ribu adds:
 	1) the ws service is cancelled greacefully/automatically when parent finishes (or manually if desired)
@@ -177,6 +175,8 @@ What ribu adds:
 In reality, since ws.send() doesn't ack from server,
 you can expose a sync .send() of the api returned by MyWebSocket
 */
+
+// Let's say I have
 function CancellableWebSocket(url) {
 	const ws = new WebSocket(url)
 
