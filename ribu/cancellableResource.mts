@@ -1,4 +1,4 @@
-import { go, Ch, onCancel, Cancellable, BroadcastCh } from "ribu"
+import { go, Ch, onEnd, Cancellable, BroadcastCh } from "ribu"
 import fs from "node:fs/promises"
 import { readFile } from "node:fs"
 
@@ -21,7 +21,7 @@ function myReadFile<Args extends Parameters<typeof readFileProm>>(...args: Args)
 		const controller = new AbortController()
 		opts.signal = controller.signal
 
-		onCancel(() => controller.abort())  // throws if main calls onCancel()
+		onEnd(() => controller.abort())  // throws if main calls onCancel()
 
 		try {
 			const prom = fs.readFile(...args)
@@ -174,7 +174,7 @@ What ribu adds:
 		so the server/client can get a chance do to things on cancellation
 	2) Ribu style Error modeling
 
-In reality, since ws.send() doesn't acknowledge reception from server,
+In reality, since ws.send() doesn't ack from server,
 you can expose a sync .send() of the api returned by MyWebSocket
 */
 function CancellableWebSocket(url) {
@@ -185,7 +185,7 @@ function CancellableWebSocket(url) {
 	const toServer = Ch()
 
 	const prc = go(function* _cancel() {
-		onCancel(ws.close)
+		onEnd(ws.close)
 		// at this point, no more "message" events are fired.
 		const reason = yield* wsClosed.rec
 		yield* prc.done.put(reason)  // the parent handles if errors.
