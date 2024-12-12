@@ -1,15 +1,20 @@
 import { tepui, Dom } from "tepui"
-import { me, myJobs, onEnd, go, wait, Ch, broadcastCh, type Prc } from "ribu"
+import { me, myJobs, onEnd, go, wait, Ch, broadcastCh, type Job } from "ribu"
 import { computed, effect } from "@preact/signals-core"
 
 
+
+
 /***** ARCHITECTURE  *****
-- ALL things ("Components") are genFn* prcS that run forever until cancelled.
-	- Run forever bc they launch a child prc that runs forever (eg: waiting user input, a signal to update...)
+- It is a front-end framework (can be used by any backend).
+	- Backend sends data and js (no additional fetching on first render)
+	- from there, front end code communicates.
+- ALL things ("Components") are jobS that run forever until cancelled.
+	- Run forever bc they launch a child job that runs forever (eg: waiting user input, a signal to update...)
 	- ?? TODO: what about the static components? (don't have user/network/etc interaction)
 - They are launched by ui(), which convert them to
 	- ctor :: () -> scene
-	- scene :: {prc, dom, remove(), ...}
+	- scene :: {job, dom, remove(), ...}
 	- "scn" = scene
 */
 
@@ -19,28 +24,31 @@ import { computed, effect } from "@preact/signals-core"
 // rm-todo: need to make parentDom available at tepui.parentDom to descendant comp
 
 class Scn {
-	constructor(public prc: Prc, public dom: HTMLElement) {}
+	constructor(public job: Job, public dom: HTMLElement) {
+
+	}
+	
 	cancel() {
 		if (this.dom !== undefined) {
 			this.dom.remove()
 		}
-		return this.prc.cancel()
+		return this.job.cancel()
 	}
 }
 
 function uiGo(genFn, ...args) {
-	const prc = go(genFn, ...args)  // component sets ui.dom = dom
+	const job = go(genFn, ...args)  // component sets ui.dom = dom
 	const { dom } = tepui
 	if (!dom) {  // not sure
 		throw Error('component must set up a dom element')
 	}
 	tepui.dom = null
-	return new Scn(prc, dom)
+	return new Scn(job, dom)
 }
 
 type ScnCtor = () => Scn
 
-// ui :: () -> {prc, dom}
+// ui :: () -> {job, dom}
 function ui(...args): ScnCtor {
 	if (args[0] === 'genFn') {
 		return () => uiGo(args[0], ...args)
@@ -55,7 +63,7 @@ function ui(...args): ScnCtor {
 	// // update
 	// const unListen = textSig.listen(newText => text.textContent = newText)
 
-	// const prc = go(function* () {
+	// const job = go(function* () {
 	// 	onEnd(unListen)
 	// })
 }
@@ -78,7 +86,7 @@ goTry(function* TodoApp() {
 	const scnCtor = ui(`div`,
 		ui('header', '.header',
 			ui('h1', 'todos'),
-			ui(TodoEntry, store),  // turns into () => { const prc = go(...); return scnObj }
+			ui(TodoEntry, store),  // turns into () => { const job = go(...); return scnObj }
 		),
 		ui(Todos, store),
 		ui(Footer, store)
@@ -88,7 +96,6 @@ goTry(function* TodoApp() {
 }, err => {
 	//...
 })
-
 
 
 function* TodoEntry(store) {
@@ -111,7 +118,7 @@ function* TodoEntry(store) {
 
 
 // DONE: Data Fetching
-// DONE: CollMngr may launch prcS inside, which will be childS of Todos, its awesome bc:
+// DONE: CollMngr may launch jobS inside, which will be childS of Todos, its awesome bc:
 	// 1) nice to understand
 	// 2) when Todos is cancelled, CollMngr will be as well.
 function* Todos(todosStore) {
@@ -209,8 +216,8 @@ function CollMngr(collStore, parentElem) {
 	// function* removes() {
 	// 	for (; ;) {
 	// 		const todoObj = yield* collStore.removesCh()
-	// 		const {dom, prc} = todo_todoComp.get(todoObj)
-	// 		yield* prc.cancel()  // each TodoView unSubs from todoSig
+	// 		const {dom, job} = todo_todoComp.get(todoObj)
+	// 		yield* job.cancel()  // each TodoView unSubs from todoSig
 	// 		dom.remove()  // dom api
 	// 	}
 	// }
@@ -240,8 +247,8 @@ ui('ul',
 function For(store, fn: ScnCtor) {
 	// implement using CollMngr
 
-	// problem, I have one prc without a dom
-	const prc = go(function* For() {
+	// problem, I have one job without a dom
+	const job = go(function* For() {
 
 	})
 
@@ -252,7 +259,7 @@ function For(store, fn: ScnCtor) {
 
 	return () => {
 		go()
-		return { prc, dom }
+		return { job, dom }
 	}
 
 	/* For could be implemented to be used like:
@@ -264,7 +271,7 @@ function For(store, fn: ScnCtor) {
 }
 
 
-// rm-todo: change event handlers as prcS
+// rm-todo: change event handlers as jobS
 function* Todo(todo: Signal<TodoObj>, todos: Signal) {
 
 	const scnCtor = ui('li',
@@ -323,12 +330,11 @@ function* Todo(todo: Signal<TodoObj>, todos: Signal) {
 function Footer(store) {
 
 	return If(() => store.count === 0, Footer_, () => ui('text', 'No Todos'))
-
-	function Footer_() {
-		// returns a comp
-	}
 }
 
+function Footer_() {
+	// returns a comp
+}
 
 
 /****** If() ******
@@ -363,7 +369,7 @@ function* _If(predFn: () => boolean, scnCtor1: ScnCtor, scnCtor2: ScnCtor) {
 
 	for (;;) {
 		const newComputedVal = yield* computedVals.rec  // computed should only fire if return val changes
-		// rm-todo: I think activeSnc.prc.cancel() should not stop scnCtor().
+		// rm-todo: I think activeSnc.job.cancel() should not stop scnCtor().
 			// bc, what if activeScn takes a lot of time cleaning its resources?
 			// but for now it's ok.
 		yield* activeScn.cancel()
@@ -388,7 +394,7 @@ function* App() {
 }
 
 // Definition:
-function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => {prc, dom}>) {
+function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => {job, dom}>) {
 
 	var parentDom = getParentDom()
 	const jobs = myJobs()
@@ -407,7 +413,7 @@ function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => {prc, 
 		yield* jobs.cancel().$
 		parentDom.replaceChildren()  // clears children
 		const restoreCh = Ch()
-		const fallbackScn = uiGo(FallbackComp, prc.val, restoreCh)
+		const fallbackScn = uiGo(FallbackComp, job.val, restoreCh)
 		parentDom.append(fallbackScn.dom)
 
 		// if user puts on this ch, then need to relaunch og comps (and remove this obviously)
@@ -450,9 +456,17 @@ function* DefaultFallbackComp(err, restoreCh) {
 
 
 /**** PENDING QUESTIONS ****/
-/* UI and prc trees too coupled?
+/* UI and job trees too coupled?
 	- Problem in web is that positioning is mainly as rows of divs, so,
-	it's generally hard for components in diffent rows to be supervised/communicate.
+	it's generally hard for components in different rows to be supervised/communicate.
+
+	OUT-THOUGHT:
+		so., people, would describe like:
+			there's a row of things at the top (eg: menu)
+			down there should be a row of something else
+				(a tree like so far)
+			but I need a pop a menu to appear just some element
+				(this is a tree based description)
  */
 
 
@@ -469,7 +483,8 @@ function* DefaultFallbackComp(err, restoreCh) {
 	internals:
 		mobxArray.filter() just marks the array as being used when filter() is called.
 	CONS:
-		1) automatic computed lifting is way harder to implemented (+codebase and -performance)
+		1) automatic computed lifting is way harder to implemented:
+			ie, it requires more lines of code and it's less performant
 */
 
 
@@ -495,6 +510,6 @@ function* DefaultFallbackComp(err, restoreCh) {
 
 
 /*** TODO ***
-	- Need a way to "extend" prcS functionality, ie, have built-in methods.
-	- An api to access the whole prcS tree (including a .state value)
+	- Need a way to "extend" jobS functionality, ie, have built-in methods.
+	- An api to access the whole jobS tree (including a .state value)
 */
