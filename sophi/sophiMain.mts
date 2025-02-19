@@ -25,7 +25,7 @@ function locateFiles(sophiConfig) {
 	return go(function* locateFiles() {
 
 		onCancel(function* () {
-			yield* filePaths.putDone()   // just a wrapper of ch.put(DONE)
+			yield* filePaths.done()   // just a wrapper of ch.put(DONE)
 		})
 
 		for (const dir of sophiConfig.folders) {

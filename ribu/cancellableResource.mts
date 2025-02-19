@@ -103,24 +103,28 @@ type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 function cbToJob<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
 
-	const job = newJob<string, ENotFound | EPerm>()
+	const ch = Ch<string, ENotFound | EPerm>()
+
+	let cancelled = false
+	onEnd(() => cancelled = true)
 
 	function cb(err, data) {
+		if (cancelled) return
 		if (err) {
 			if (err.code === "ENOENT") {
-				job.settle(E("NotFound", err))
+				ch.enQ(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
-				job.settle(E("Perm", err))
+				ch.enQ(E("Perm", err))
 			}
 		}
-		job.settle(data)
+		ch.enQ(data)
 	}
 
 	args.push(cb)
 	cbBasedFn(...args)
 
-	return job
+	return ch
 }
 
 function* main() {

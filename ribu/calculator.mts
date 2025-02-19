@@ -3,28 +3,28 @@ import { e } from "./ribu-errors.mjs"
 
 /* Statechart implementation in ribu.
 
-	- A state is a prc
+	- A state is a job
 
 	- Arrow going into a substate:
-		- arrow: parameter (check parameter to launch what substate/prc to launch).
+		- arrow: parameter (check parameter to launch what substate/job to launch).
 
 	- An Arrow going out of grouped states:
 		- Composition: group of waiting events can be reused in +1 states.
 		- OR: a coordinator listening for that event (and cancelling children)
 
-	- Arrow conditions are just if statements within a prc.
+	- Arrow conditions are just if statements within a job.
 
  * Key ribu learnings:
 		- "free" version of go() is wrong bc it leads to ambiguity of which
-		is the prc's ancestor, which breaks throw/catch.
+		is the job's ancestor, which breaks throw/catch.
 		- solution is for some ancestor access its child_s() and pass down, so
-		that children can launch prcS from that bundle.
+		that children can launch jobS from that bundle.
 */
 
 // channels
 const buttons = Ch()
 
-// state is reactive
+// state is reactive so ui can be synced
 type Model = {
 	num1?: number,
 	num2?: number,
@@ -40,72 +40,68 @@ let model: Model = {
 	}
 }
 
-let jobs: Pool<void>
-
 go(function* main() {
-	jobs = myJobs()
 
-	jobs.go(function* C() {
-		while (true) {
+	let jobs = myJobs()
+
+	go(function* C() {
+		for (;;) {
+			jobs.go(start, jobs)
 			yield* C_button.onClick
-			const siblings = jobs.toSpliced(jobs.indexOf(me()), 1)
-			yield* cancel(siblings).$  // cancel() can pass Job | Job[]
-			jobs.go(start)
+			yield* jobs.cancel()
 		}
 	})
-
-	go(start)
-
-}).catchRun((err: Error) => {
 
 })
 
 
-// if/when start* launches another prc, it finishes, so jobs
+// if/when start* launches another job, it finishes, so jobs
 	// needs to delete the pointer to start* (or memory leak otherwise)
 
-function* start() {
-	model.init()
-	const but = yield* buttons.rec
-	if (isZero9OrDot(but)) {
-		// *Operand1 is not a child of *start, but of *supervisor, so *start can finish
+function* start(jobs: Pool<void>) {
+	model.init()  // ui updates, need a way to connect to the ui and events comming in
+	const button = yield* buttons.rec
+	if (isZero9OrDot(button)) {
+
+		// *Operand1 is not a child of *start, but of *main, so *start can finish
 			// without waiting for *Operand1 to finish.
-		// IMPLEMENTATION: *supervisor's children changes all the time, so when some
-			// finishes and others are added, ribu needs to handle internally _when_ to let supervisor finish.
-		jobs.go(Operand1, but)
+
+		jobs.go(Operand1, button)
+
+		return
 	}
-	if (isNegOp(but)) {
-		jobs.go(NegNum, but)
+	if (isNegOp(button)) {
+		jobs.go(NegNum, button)
 	}
 }
 
 
-function* Operand1(but) {
-	let prc =
-		but === 0 ? go(zero) :
-		but === "1-9" ? go(beforeDot) :
+function* Operand1(button) {
+	let job =
+		button === 0 ? go(zero) :
+		button === "1-9" ? go(beforeDot) :
 		go(afterDot)
 
 	const _but = yield* button(op, percentage, CE).rec
-	yield prc.cancel()
-	if (but === percentage) jobs.go(result)
-	if (but === CE) jobs.go(start)
+	yield job.cancel()
+	if (button === percentage) jobs.go(result)
+	if (button === CE) jobs.go(start)
 	jobs.go(OpEntered)
 
 	// helpers
 	function* zero() {
-		const but = yield* buttons(one9, dot).rec  // rest of buttons are disabled and not listening
-		if (isOne9(but)) {
-			prc = go(beforeDot)
+		const button = yield* buttons(one9, dot).rec  // rest of buttons are disabled and not listening
+		if (isOne9(button)) {
+			job = go(beforeDot)
 		}
-		prc = go(beforeDot)
+		job = go(beforeDot)
 	}
 
 	function* beforeDot() {
 		while (true) {
-			const but = yield* buttons(zero9, dot).rec
-			if (isDot(but)) {
-				prc = go(afterDot)
+			const button = yield* buttons(zero9, dot).rec
+			if (isDot(button)) {
+				job = go(afterDot)
 				return
 			}
 			continue

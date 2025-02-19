@@ -27,7 +27,7 @@ class Scn {
 	constructor(public job: Job, public dom: HTMLElement) {
 
 	}
-	
+
 	cancel() {
 		if (this.dom !== undefined) {
 			this.dom.remove()
@@ -38,7 +38,7 @@ class Scn {
 
 function uiGo(genFn, ...args) {
 	const job = go(genFn, ...args)  // component sets ui.dom = dom
-	const { dom } = tepui
+	const { dom } = tepui  // system context object
 	if (!dom) {  // not sure
 		throw Error('component must set up a dom element')
 	}
@@ -50,10 +50,12 @@ type ScnCtor = () => Scn
 
 // ui :: () -> {job, dom}
 function ui(...args): ScnCtor {
-	if (args[0] === 'genFn') {
+	if (typeof args[0] === 'function') {  // genFn
 		return () => uiGo(args[0], ...args)
 	}
-	if (args[1]) {}
+	if (args[1]) {
+
+	}
 
 	// const dom = document.createElement(tag)
 	// // need to dissambiguate static vs signals parts.
@@ -119,12 +121,12 @@ function* TodoEntry(store) {
 
 // DONE: Data Fetching
 // DONE: CollMngr may launch jobS inside, which will be childS of Todos, its awesome bc:
-	// 1) nice to understand
-	// 2) when Todos is cancelled, CollMngr will be as well.
+// 1) nice to understand
+// 2) when Todos is cancelled, CollMngr will be as well.
 function* Todos(todosStore) {
 
 	go(function fetchTodos() {  // this is a child of *Todos
-		const item = yield* fetchData()  // will block here and here and continue below
+		const item = yield fetchData()  // will block here and here and continue below
 		// update signals, mutate domElem directly...
 	})
 
@@ -139,10 +141,10 @@ function* Todos(todosStore) {
 
 	let dom = ui('ul', `.todo-list`)().dom
 
-	const collMngr = CollMngr(todosStore, dom)
+	const collMngr = CollectionMngr(todosStore, dom)
 
 	go(function* todoAdd() {
-		for (;;) {
+		for (; ;) {
 			const todo = yield* collMngr.onAdd()
 
 			//  *Todo is child of *todoAdd -> ok, since *todoAdd is a child of *Todos
@@ -180,7 +182,7 @@ User DON'T want to know about:
 // rm-todo: maintain sort capabilities
 // provide api which doesn't append to dom so that api client sorts itself
 // and another api to mantain sort a let client just do collmngr.insertToDom(comp, item)
-function CollMngr(collStore, parentElem) {
+function CollectionMngr(collStore, parentElem) {
 
 	// a cache is needed so when a "todo was removed" arrives, we need to know
 	// which todoView to remove/cancel
@@ -284,8 +286,11 @@ function* Todo(todo: Signal<TodoObj>, todos: Signal) {
 		editingInput(`.edit`, { value: todo.title, onblur: exitEdit, onkeydown: exitEdit })
 	)
 
-	// Event handlers
 	const { li, title, editingInput, deleteBttn } = scnCtor().dom
+
+	// Event handlers - different API alternatives:
+	// 1) Need something to unsubscribe from dom events.
+	// 2) If doing something async, need a job (to cancel)
 
 	function completeTodo() {
 		todo.completed.value = !todo.completed
@@ -293,7 +298,9 @@ function* Todo(todo: Signal<TodoObj>, todos: Signal) {
 		li.classList.toggle(`completed`)
 	}
 
-	title.ondblclick = () => {   // onXYQ is a proxy getter translated to dom.addEventListener(...)
+	// on... is a proxy setter translated to dom.addEventListener(...)
+	// todo: how to unsubscribe?
+	title.ondblclick = () => {
 		editingInput.focus()
 		li.classList.add(`editing`)
 	}
@@ -367,11 +374,11 @@ function* _If(predFn: () => boolean, scnCtor1: ScnCtor, scnCtor2: ScnCtor) {
 	const parentDom = getParentDom()
 	parentDom.append(activeScn.dom)
 
-	for (;;) {
+	for (; ;) {
 		const newComputedVal = yield* computedVals.rec  // computed should only fire if return val changes
 		// rm-todo: I think activeSnc.job.cancel() should not stop scnCtor().
-			// bc, what if activeScn takes a lot of time cleaning its resources?
-			// but for now it's ok.
+		// bc, what if activeScn takes a lot of time cleaning its resources?
+		// but for now it's ok.
 		yield* activeScn.cancel()
 		const newScn = (newComputedVal === true ? scnCtor1() : scnCtor2())
 		parentDom.replaceChild(newScn.dom, activeScn.dom)
@@ -386,7 +393,7 @@ function* _If(predFn: () => boolean, scnCtor1: ScnCtor, scnCtor2: ScnCtor) {
 // Usage:
 function* App() {
 	// kinda weird that Error_Boundary FallbackComp isn’t wrapped in ui() but OK
-	const scnCtor = Catch(FallbackComp,	[
+	const scnCtor = Catch(FallbackComp, [
 		ui(Greeting, store),
 		ui(Farewell, store)
 	])
@@ -394,21 +401,21 @@ function* App() {
 }
 
 // Definition:
-function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => {job, dom}>) {
+function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => { job, dom }>) {
 
 	var parentDom = getParentDom()
 	const jobs = myJobs()
 
-	for(;;) {
+	for (; ;) {
 		for (const ctor of scnCtors) {
-			const {dom} = ctor()  // all scenes are children of *sup (which is a child of *Error_Boundary)
+			const { dom } = ctor()  // all scenes are children of *sup (which is a child of *Error_Boundary)
 			parentDom.append(dom)
 		}
 
 		yield* jobs.rec  // reports when a jobs ends
 
 		// But since tepui jobs are meant to be ran forever until cancelled/fails...
-			// It means that a job did not complete. Either way...
+		// It means that a job did not complete. Either way...
 
 		yield* jobs.cancel().$
 		parentDom.replaceChildren()  // clears children
@@ -418,7 +425,7 @@ function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => {job, 
 
 		// if user puts on this ch, then need to relaunch og comps (and remove this obviously)
 		// if user never puts to Ch, *Error_Boundary will be blocked forever until cancelled
-			// rm-todo: maybe Error_Boundary can be implemented in terms of If()
+		// rm-todo: maybe Error_Boundary can be implemented in terms of If()
 		yield* restoreCh.rec
 		// if I'm here, means user wants to restore
 
