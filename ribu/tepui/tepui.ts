@@ -24,9 +24,10 @@ import { computed, effect } from "@preact/signals-core"
 // rm-todo: need to make parentDom available at tepui.parentDom to descendant comp
 
 class Scn {
-	constructor(public job: Job, public dom: HTMLElement) {
-
-	}
+	constructor(
+		public job: Job,
+		public dom: HTMLElement)
+	{}
 
 	cancel() {
 		if (this.dom !== undefined) {
@@ -36,7 +37,7 @@ class Scn {
 	}
 }
 
-function uiGo(genFn, ...args) {
+function uiGo(genFn, ...args): Scn {
 	const job = go(genFn, ...args)  // component sets ui.dom = dom
 	const { dom } = tepui  // system context object
 	if (!dom) {  // not sure
@@ -78,7 +79,7 @@ function getParentDom(): HTMLElement {
 
 /****** TodoApp ******/
 
-goTry(function* TodoApp() {
+go(function* TodoApp() {
 
 	// init dataMem
 	// if pass an array in adds as a single batch.
@@ -95,9 +96,8 @@ goTry(function* TodoApp() {
 	)
 
 	document.getElementById('root')?.append(scnCtor().dom)
-}, err => {
-	//...
 })
+.catch(/* ... */)
 
 
 function* TodoEntry(store) {
@@ -125,7 +125,7 @@ function* TodoEntry(store) {
 // 2) when Todos is cancelled, CollMngr will be as well.
 function* Todos(todosStore) {
 
-	go(function fetchTodos() {  // this is a child of *Todos
+	go(function* fetchTodos() {  // this is a child of *Todos
 		const item = yield fetchData()  // will block here and here and continue below
 		// update signals, mutate domElem directly...
 	})
@@ -144,7 +144,7 @@ function* Todos(todosStore) {
 	const collMngr = CollectionMngr(todosStore, dom)
 
 	go(function* todoAdd() {
-		for (; ;) {
+		for (;;) {
 			const todo = yield* collMngr.onAdd()
 
 			//  *Todo is child of *todoAdd -> ok, since *todoAdd is a child of *Todos
@@ -406,7 +406,7 @@ function* Catch(FallbackComp = DefaultFallbackComp, scnCtors: Array<() => { job,
 	var parentDom = getParentDom()
 	const jobs = myJobs()
 
-	for (; ;) {
+	for (;;) {
 		for (const ctor of scnCtors) {
 			const { dom } = ctor()  // all scenes are children of *sup (which is a child of *Error_Boundary)
 			parentDom.append(dom)
@@ -468,11 +468,11 @@ function* DefaultFallbackComp(err, restoreCh) {
 	it's generally hard for components in different rows to be supervised/communicate.
 
 	OUT-THOUGHT:
-		so., people, would describe like:
-			there's a row of things at the top (eg: menu)
-			down there should be a row of something else
+		so people, would describe a ui like:
+			- there's a row of things at the top (eg: menu)
+			- down there should be a row of something else
 				(a tree like so far)
-			but I need a pop a menu to appear just some element
+			- but I need a pop a menu to appear just some element
 				(this is a tree based description)
  */
 

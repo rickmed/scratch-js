@@ -1,6 +1,6 @@
 // this is what we want to comply to
 interface Comply {
-	method1(): string
+	method1(): number
 }
 
 function fn1(x: Comply) {
@@ -20,7 +20,7 @@ class Methods<V> {
 
 
 /*****   Mixins with POJOs   *****/
-// Problem: properties are not private.
+// Issue: properties are not private.
 // Trade-off: either public Ks or copy methods (Ks in clouse)
 
 interface User<V> extends Methods<V> {

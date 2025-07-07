@@ -7,6 +7,7 @@ import { readFile } from "node:fs"
 		- onCancel(() => {}) doesn't work bc if the process already has it set up (would overwrite)
 	2) Loses nice stack trace with genName and args on delegated gen
 	3) Can't compose, eg, if want to launch two in parallel.
+
 */
 
 /*
@@ -77,7 +78,7 @@ export type ToGenFn<T extends any[]> =
 	T extends [Callback<infer R>?] ? () => Gen<R> :
 	T extends [infer T1, Callback<infer R>?] ? (arg1: T1) => Gen<R> :
 	T extends [infer T1, infer T2, Callback<infer R>?] ? (arg1: T1, arg2: T2) => Gen<R> :
-	T extends [infer T1, infer T2, infer T3, Callback<infer R>?] ? (arg1: T1, arg2: T2, arg3: T3) => Gen<R> :
+	T extends [infer T1, infer T2, infer T3, Callback<infer R>?] ? (arg1: T1, arg2: T3) => Gen<R> :
 	T extends [infer T1, infer T2, infer T3, infer T4, Callback<infer R>?] ? (arg1: T1, arg2: T2, arg3: T3, arg4: T4) => Gen<R> :
 	T;
 
@@ -101,34 +102,49 @@ export type Res<Args extends any[]> =
 type MyGen<Fn> = Res<OverloadArgs<Fn>>
 
 
-function cbToJob<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
+/*
+PROBLEMS:
+	1) I'd like to call 2 cbTo_Ch_ish and race/cancel them
+		Right now, both onEnds would be added to parent.
+	2) onEnd() needs to be called when ch.enQueue is called (ie, when "job is done")
+		Here no resources are opened, but in other cases they would.
+So,
+	It would be a job that:
+		Has no _gen, children
+		Can only add one onEnd (optimization)
 
-	const ch = Ch<string, ENotFound | EPerm>()
+Also, jobish could potentially be recycled since have no gen
+
+*/
+function cbTo_Jobling<T extends Function>(cbBasedFn: T, ...args: OverloadArgs<T>): MyGen<T> {
+
+	const job = Job<string, ENotFound | EPerm>()
 
 	let cancelled = false
-	onEnd(() => cancelled = true)
+	job.onEnd(() => cancelled = true)
+	job.name(cbBasedFn.name)
 
 	function cb(err, data) {
 		if (cancelled) return
 		if (err) {
 			if (err.code === "ENOENT") {
-				ch.enQ(E("NotFound", err))
+				job.settle(E("NotFound", err))
 			}
 			if (err.code === "ENOENT") {
-				ch.enQ(E("Perm", err))
+				job.settle(E("Perm", err))
 			}
 		}
-		ch.enQ(data)
+		job.settle(data)
 	}
 
 	args.push(cb)
 	cbBasedFn(...args)
 
-	return ch
+	return job
 }
 
 function* main() {
-	const res = yield* cbToJob(readFile, "foo.txt", { encoding: "utf8" })
+	const res = yield* cbTo_Jobling(readFile, "foo.txt", { encoding: "utf8" })
 }
 
 
@@ -221,3 +237,26 @@ function CancellableWebSocket(url) {
 
 	return {}
 }
+
+// Benchmark to compare accessing a property in an object vs using a WeakMap
+function benchmark() {
+	const iterations = 1000000;
+	const obj = { key: "value" };
+	const weakMap = new WeakMap();
+	const key = {};
+	weakMap.set(key, "value");
+
+	console.time("Object Property Access");
+	for (let i = 0; i < iterations; i++) {
+		const value = obj.key;
+	}
+	console.timeEnd("Object Property Access");
+
+	console.time("WeakMap Access");
+	for (let i = 0; i < iterations; i++) {
+		const value = weakMap.get(key);
+	}
+	console.timeEnd("WeakMap Access");
+}
+
+benchmark();

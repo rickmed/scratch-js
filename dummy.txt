@@ -1,1 +1,36 @@
-Hellooo!
+/*
+endProtocol bad:
+   - remove from current Target
+   - cancel children is any.
+      - wait for them.
+   - run onEnds
+
+who calls endProtocol:
+   - genFn failed (threw or returned Err)
+      -> need to cancel children if any
+   - cancel()
+
+
+cancel()
+   - remove from current Target
+   - cancel children if any.
+      - wait for them.
+   - run onEnds
+
+finishedOK:
+   - wait for children.
+   - run onEnds
+
+
+endProtocol():
+   if (parked) -> unsub from tg
+   if (!childs) -> execOnEnds
+
+
+waitingChildren, if child failed:
+   - could also be that children were cancelled bc genFn failed.
+   - if I was cancelled, just continue
+      (no need to re trigger children cancel)
+   - Otherwise, Depends on CANCEL_SIBLINGS_ON_ERR
+
+*/

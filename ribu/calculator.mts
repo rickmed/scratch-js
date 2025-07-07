@@ -21,7 +21,6 @@ import { e } from "./ribu-errors.mjs"
 		that children can launch jobS from that bundle.
 */
 
-// channels
 const buttons = Ch()
 
 // state is reactive so ui can be synced
@@ -42,12 +41,13 @@ let model: Model = {
 
 go(function* main() {
 
+	// throw if myJobs is used in a non-job context
 	let jobs = myJobs()
 
 	go(function* C() {
 		for (;;) {
 			jobs.go(start, jobs)
-			yield* C_button.onClick
+			yield* buttons("C").rec
 			yield* jobs.cancel()
 		}
 	})

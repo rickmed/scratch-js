@@ -1,30 +1,18 @@
 {
-  "type": "module",
-  "imports": {
-    "#mymod": "./import_modules/module1.js"
-  },
-  "dependencies": {
-    "@badrap/valita": "^0.3.8",
-    "@preact/signals-core": "^1.5.1",
-    "@sinclair/typebox": "^0.32.22",
-    "benchmark": "^2.1.4",
-    "chalk": "^5.3.0",
-    "expect": "^29.4.3",
-    "js-csp": "^1.0.1",
-    "latest": "^0.2.0",
-    "rxjs": "^7.8.1",
-    "superstruct": "^1.0.5-0",
-    "tsx": "^4.7.1",
-    "undici": "^5.22.1",
-    "zod": "^3.22.5"
+  "name": "js-object-benchmark",
+  "version": "1.0.0",
+  "description": "Benchmark comparing JavaScript object reference equality vs assignment",
+  "main": "benchmark.js",
+  "scripts": {
+    "build": "tsc benchmark.ts",
+    "start": "node benchmark.js",
+    "benchmark": "npm run build && npm run start"
   },
   "devDependencies": {
-    "@types/chai": "^4.3.14",
-    "@types/node": "^22.10.7",
-    "chai": "^5.1.0",
-    "sophi": "^0.1.2",
-    "typescript": "^5.2.2",
-    "valibot": "^0.30.0",
-    "vitest": "^1.5.0"
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "effect": "^3.16.7",
+    "mitata": "^1.0.34"
   }
 }
