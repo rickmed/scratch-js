@@ -81,19 +81,19 @@ function getParentDom(): HTMLElement {
 
 go(function* TodoApp() {
 
-	// init dataMem
 	// if pass an array in adds as a single batch.
 	const store = new Store()
 	store.add(todosFromServerArr)
 
-	const scnCtor = ui(`div`,
-		ui('header', '.header',
-			ui('h1', 'todos'),
-			ui(TodoEntry, store),  // turns into () => { const job = go(...); return scnObj }
-		),
-		ui(Todos, store),
-		ui(Footer, store)
-	)
+	const scnCtor =
+		ui(`div`,
+			ui('header', '.header',
+				ui('h1', 'todos'),
+				ui(TodoEntry, store),  // turns into () => { const job = go(...); return scnObj }
+			),
+			ui(Todos, store),
+			ui(Footer, store)
+		)
 
 	document.getElementById('root')?.append(scnCtor().dom)
 })
