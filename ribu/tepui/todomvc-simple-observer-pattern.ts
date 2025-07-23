@@ -27,7 +27,6 @@
 
 
 // Parents should .cancel() .removeFromDOM() children instead them doing it themselves.
-*/
 
 
 
@@ -66,11 +65,10 @@ function ui(componentOrTag, props, ...children) {
 
 type Scn = { job: Job | null; el: HTMLElement };
 
-// For
-/* Usage
+/* For() Usage
 
 ui("div",
-  ui("header", /* … */),
+  ui("header"),
   For("ul", store, (todo, i) =>
     ui("li",
       ui("input", { type: "checkbox", checked: todo.completed }),
@@ -78,8 +76,8 @@ ui("div",
       ui("button", "x")
     )
   ),
-  ui("footer", /* … */)
-);
+  ui("footer")
+)
 */
 
 function For<T>(

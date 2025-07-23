@@ -87,12 +87,12 @@ go(function* TodoApp() {
 
 	const scnCtor =
 		ui(`div`,
-			ui('header', '.header',
-				ui('h1', 'todos'),
-				ui(TodoEntry, store),  // turns into () => { const job = go(...); return scnObj }
+			header('.header',
+				h1('todos'),
+				TodoEntry,
 			),
-			ui(Todos, store),
-			ui(Footer, store)
+			[TodoList, store],
+			[Footer, store]
 		)
 
 	document.getElementById('root')?.append(scnCtor().dom)
