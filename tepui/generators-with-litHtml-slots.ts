@@ -1,3 +1,19 @@
+// Turn a union of objects into a single intersected object type
+type UnionToIntersection<U> =
+  (U extends any ? (k: U) => void : never) extends
+  (k: infer I) => void ? I : never;
+
+function div<const V extends object[]>(
+  _s: TemplateStringsArray,
+  ...vals: V
+): UnionToIntersection<V[number]> {
+  // runtime: merge every object hole; ignore non-objects if you ever pass them
+  const out: any = {};
+  for (const v of vals) if (v && typeof v === 'object') Object.assign(out, v);
+  return out;
+}
+
+
 function *Timer(seconds = 0) {
   // div makes it observable and returns a getter/setter that directly mutates the DOM.
   // yield renders and publishes the vars.
@@ -23,8 +39,8 @@ Issues:
   - Updates from network. In model-view signals, the view updates from the model-view mutations.
     - Maybe we can use "actions" as events.
 
-  - Persisting
-
+  - Persisting: since seconds var is published, the interpreter could subscribe to changes.
+  - We loose types (as any lit-html template).
 */
 
 
@@ -91,20 +107,7 @@ type _Check = typeof source.yields; // "yes"
 
 
 
-// Turn a union of objects into a single intersected object type
-type UnionToIntersection<U> =
-  (U extends any ? (k: U) => void : never) extends
-  (k: infer I) => void ? I : never;
 
-function div<const V extends object[]>(
-  _s: TemplateStringsArray,
-  ...vals: V
-): UnionToIntersection<V[number]> {
-  // runtime: merge every object hole; ignore non-objects if you ever pass them
-  const out: any = {};
-  for (const v of vals) if (v && typeof v === 'object') Object.assign(out, v);
-  return out;
-}
 
 // ----------------- usage -----------------
 const { var1, var2 } = div`
