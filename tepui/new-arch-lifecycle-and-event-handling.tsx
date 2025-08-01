@@ -48,11 +48,5 @@ function* Component2(store: {someSignal: string}) {
 
 // Edit todo on input and commit on enter.
 function* Component3() {
-   const part = html`
-      <div>
-         <input type="text" id="theInput">
-      </div>
-   `
-
-   part.slots?.theInput.elem.focus()
+  
 }
