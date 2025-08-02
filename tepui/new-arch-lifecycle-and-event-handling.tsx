@@ -39,7 +39,9 @@ function* Component2(store: {someSignal: string}) {
       $.dynValue = store.someSignal
    })
 
-   part.elems?.theInput.focus()
+   if (ctx().client) {
+      part.elems.theInput.focus()
+   }
 }
 
 
@@ -48,5 +50,5 @@ function* Component2(store: {someSignal: string}) {
 
 // Edit todo on input and commit on enter.
 function* Component3() {
-  
+
 }

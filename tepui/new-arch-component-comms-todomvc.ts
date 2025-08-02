@@ -5,15 +5,15 @@ function FilterLink(name: string, store: Filter) {
             ${name}
          </a>
       </li>
-   `.auto(({$}) => {
-		$.class = store.selected === name ? "selected" : "";
-	});
+   `.auto(({ $ }) => {
+		$.class = store.selected === name ? "selected" : ""
+	})
 }
 
-type Filter = { selected: "All" | "Active" | "Completed" };
+type Filter = { selected: "All" | "Active" | "Completed" }
 
 class FilterLinks {
-	static Store = () => Cell({ selected: "All" } satisfies Filter);
+	static Store = () => Cell({ selected: "All" } satisfies Filter)
 
 	// Component method (could be static too if you prefer)
 	static Part(store: Filter) {
@@ -22,7 +22,7 @@ class FilterLinks {
 				${FilterLink("All", store)} ${FilterLink("Active", store)}
 				${FilterLink("Completed", store)}
 			</ul>
-		`;
+		`
 	}
 }
 
@@ -43,28 +43,25 @@ function Footer() {
 				  </button>`
 				: nothing}
 		</footer>
-	`;
+	`
 }
 
 function Main() {
-	const todosFilter = FilterLinks.Store();
+	const todosFilter = FilterLinks.Store()
 
-	const header = Header();
-	const footer = Footer();
-	const todos = Todos(todosFilter);
+	const header = Header()
+	const footer = Footer()
+	const todos = Todos(todosFilter)
 
-	html` <div>${header} ${todos} ${footer}</div> `;
+	html` <div>${header} ${todos} ${footer}</div> `
 }
 
 type Todo = {
-   title: string
-   completed: boolean
+	title: string
+	completed: boolean
 }
 
 function TodoItem(todo: Todo) {
-
-   let editJob: Job = MockJob
-
 	const part = html`
 		<li class=${$.class}>
 			<div class="view">
@@ -72,40 +69,35 @@ function TodoItem(todo: Todo) {
 					class="toggle"
 					type="checkbox"
 					.checked=${$.checked}
-					@change=${() => todo.completed = !todo.completed}
+					@change=${() => (todo.completed = !todo.completed)}
 				/>
-				<label @dblclick=${() => go(editTodo)}> ${todo.title} </label>
+				<label @dblclick=${editTodo}> ${todo.title} </label>
 				<button id="delete" class="destroy"></button>
 			</div>
-			<input
-				class="edit"
-				type="text"
-				@change=${this.#finishEdit}
-				@keyup=${this.#captureEscape}
-				@blur=${this.#abortEdit}
-				.value=${this.text ?? ""}
-			/>
+			<input class="edit" type="text" />
 		</li>
-	`
-   .auto(({$}) => {
-      // html detects .class is a slot so it returns an object with methods instead of simple setter.
-         // with .clear() and .set()  (maybe more look dom methods)
-      $.class.add(todo.completed ? "completed" : "")
-      $.checked = todo.completed
-   })
+	`.auto(({ $ }) => {
+		// html detects .class is a slot so it returns an object with methods instead of simple setter.
+		// with .clear() and .set()  (maybe more look dom methods)
+		$.class.add(todo.completed ? "completed" : "")
+		$.checked = todo.completed
+	})
 
-   // todo: try to infer ev param to be  this from template @dblclick
-   // todo: how is this job cancelled if TodoItem part is cancelled from parent?
-   function* editTodo(ev: Event) {
-      const todoClass = part.$.class
-      todoClass.add("editing")
-      onEnd(() => todoClass.remove("editing"))
-      
-   }
+	// todo: try to infer ev param to be this from template @dblclick
+	// todo: how is this job cancelled if TodoItem part is cancelled from parent?
+	function* editTodo({ target: editInput }: Event) {
+		const todoClass = part.$.class
+		todoClass.add("editing") // or just input.show() or just .replace(todo)
+		onEnd(() => todoClass.remove("editing"))
+
+		yield* paint
+
+		const enter = editInput.on("keyDown", ({key}) => key === 'Enter')
+		const escape = editInput.on("keyDown", ({key}) => key === 'Escape')
+		const blur = editInput.on("blur")
+      const ev = yield* any([enter, escape, blur])
+		if (ev === enter) {
+			todo.title = editInput.value
+		}
+	}
 }
-
-
-// <li className={[
-//    todo.completed ? "completed": "",
-//    this.isBeingEdited ? "editing" : ""
-// ]
