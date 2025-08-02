@@ -84,7 +84,26 @@ function TodoItem(todo: Todo) {
 	})
 
 	// todo: try to infer ev param to be this from template @dblclick
-	// todo: how is this job cancelled if TodoItem part is cancelled from parent?
+
+// todo: how is this job cancelled if TodoItem part is cancelled from parent?
+   // this could be added to part._resources so on part.cancel() everything is cancelled.
+      // main issue is async cancellation. bc now in theory every part must
+      // be wrapped in a job to do yield* part.cancel() -> too expensive
+
+/*
+const job = go(editTodo(ev))
+
+if (resource instance of Job) {
+   job.cancel()
+   .catch(walkToNearestErrorBoundary)
+}
+
+walkToNearestErrorBoundary
+
+*/
+
+
+
 	function* editTodo({ target: editInput }: Event) {
 		const todoClass = part.$.class
 		todoClass.add("editing") // or just input.show() or just .replace(todo)
