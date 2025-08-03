@@ -1,22 +1,49 @@
-function TodoItem(todo: Todo) {
+function FilterLink1(name: string, store: Filter) {
 	const part = html`
-		<div @click=${asyncFlow}>
-		</div>
-	`
+      <$li li>
+         <$a a></a>
+         <$p p></p>
+      </li>
+   `
+   part.$.a.text = name
+   part.$.a.href = name.toLowerCase()
+   part.$.p.text = name.toUpperCase()
+
+   return part.auto(({ $ }) => {
+      $.li.class = store.selected === name ? "selected" : ""
+   })
+}
+
+function FilterLink2(name: string, store: Filter) {
+	return html`
+      <$li li>
+         <a href=${`#${name.toLowerCase()}`}>
+            ${name}
+         </a>
+      </li>
+   `.auto(({ $ }) => {
+		$.li.class = store.selected === name ? "selected" : ""
+	})
+}
 
 
-function* asyncFlow({ target: editInput }: Event) {
-  const todoClass = part.$.class
-  todoClass.add("editing") // or just input.show() or just .replace(todo)
-  onEnd(() => todoClass.remove("editing"))
+function FilterLink3(name: string, store: Filter) {
+   return li({id: $.li},
+      a({href: `#${viewFilter.toLowerCase()}`}, name)
+   )
+   .auto(part => {
+      part.$.li.class = store.selected === name ? "selected" : ""
+   })
+}
 
-  yield* paint
+const View =
+   li({id: $.li},
+      a({href: $.href}, $.name)
+   )
 
-  const enter = editInput.on("keyDown", ({key}) => key === 'Enter')
-  const escape = editInput.on("keyDown", ({key}) => key === 'Escape')
-  const blur = editInput.on("blur")
-    const ev = yield* any([enter, escape, blur])
-  if (ev === enter) {
-    todo.title = editInput.value
-  }
+function FilterLink4(name: string, store: Filter) {
+   return View({href: `#${name.toLowerCase()}`, name})
+      .auto(part => {
+         part.li.class = store.todoFilter === viewFilter ? "selected" : ""
+      })
 }

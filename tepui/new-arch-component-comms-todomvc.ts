@@ -1,6 +1,6 @@
 function FilterLink(name: string, store: Filter) {
 	return html`
-      <li class: ${$.class}>
+      <li class=${$.class}>
          <a href=${`#${name.toLowerCase()}`}>
             ${name}
          </a>
@@ -19,7 +19,8 @@ class FilterLinks {
 	static Part(store: Filter) {
 		return html`
 			<ul class="filters">
-				${FilterLink("All", store)} ${FilterLink("Active", store)}
+				${FilterLink("All", store)}
+            ${FilterLink("Active", store)}
 				${FilterLink("Completed", store)}
 			</ul>
 		`
