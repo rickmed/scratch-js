@@ -76,7 +76,7 @@ function TodoItem(todo: Todo) {
 			</div>
 			<input class="edit" type="text" />
 		</li>
-	`.auto(({ $ }) => {
+	`.auto(({$}) => {
 		// html detects .class is a slot so it returns an object with methods instead of simple setter.
 		// with .clear() and .set()  (maybe more look dom methods)
 		$.class.add(todo.completed ? "completed" : "")
@@ -91,14 +91,8 @@ function TodoItem(todo: Todo) {
       // be wrapped in a job to do yield* part.cancel() -> too expensive
 
 /*
-const job = go(editTodo(ev))
 
-if (resource instance of Job) {
-   job.cancel()
-   .catch(walkToNearestErrorBoundary)
-}
 
-walkToNearestErrorBoundary
 
 */
 
