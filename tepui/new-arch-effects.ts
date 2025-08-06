@@ -1,10 +1,12 @@
+import { h } from "tepui"
+
 /* Fetch lifecycle */
 
 /****** fetching (with SSR) *******/
 function* Component() {
-	html`<p>Loading user...</p>` // html`` by default replaces whatever is this component view slot.
-	const user = yield* fetchUser()
-	const part = html`<p>Hi! ${user.name}</p>`
+   h.p("Loading user...") // Replaces whatever is in this component view slot
+   const user = yield* fetchUser()
+   h.p(`Hi! ${user.name}`)
 }
 
 // Error handling
@@ -21,62 +23,70 @@ function* Component() {
 
 /****** fetching (with SSR and effects) *******/
 function* Component2(store: { someSignal: string }) {
-	// html`` by default replaces whatever is in this component view slot.
-	html`<p>Loading input...</p>`
+   h.p({ text: "Loading input..." }) // Replaces whatever is in this component view slot
 
-	const value = yield* fetchInputDefaultValue()
+   const value = yield* fetchInputDefaultValue()
 
-	const part = html`
-      <div>
-         <p class=${$.dynValue} </p>
-         <input type="text" id="theInput" value=${value}>
-      </div>
-   `.auto(({ $ }) => {
-		$.dynValue = store.someSignal
-	})
+   const part = h.div(
+      h.p({ text: $.dynValue }),
+      h.input({
+         type: "text",
+         id: "theInput",
+         value: value,
+      })
+   ).auto(({ $ }) => {
+      $.dynValue = store.someSignal
+   })
 
-	if (ctx().client) {
-		part.elems.theInput.focus()
-	}
+   if (ctx().client) {
+      part.elems.theInput.focus()
+   }
 }
 
 function ShowWindowSize() {
-	html` <div>${$.innerWidth} x ${$.innerHeight}</div> `
-		// in SSR is a noop
-		.listen(window, "resize", (ev, part) => {
-			part.innerWidth = ev.currentTarget.innerWidth
-			part.innerHeight = ev.currentTarget.innerHeight
-		})
+   h.div(`${$.innerWidth} x ${$.innerHeight}`)
+      // in SSR is a noop
+      .listen(window, "resize", (ev, part) => {
+         part.innerWidth = ev.currentTarget.innerWidth
+         part.innerHeight = ev.currentTarget.innerHeight
+      })
 
-		.onClient((part) => {
-			// .on is a wrapper of:
-			const resize = () => {
-				part.innerWidth = window.innerWidth
-				part.innerHeight = window.innerHeight
-			}
-			window.addEventListener("resize", resize)
-			// when part.cancel() is called, part can call a rsc release like dispose()
-			part.rsc(() => window.removeEventListener("resize", resize))
-		})
+      // .listen is a wrapper of:
+      .onClient((part) => {
+         const resize = () => {
+            part.innerWidth = window.innerWidth
+            part.innerHeight = window.innerHeight
+         }
+         window.addEventListener("resize", resize)
+         // when part.cancel() is called, part can call a rsc release like dispose()
+         part.rsc(() => window.removeEventListener("resize", resize))
+      })
 }
 
 /* Timer */
 function Timer() {
-	html` <div>${$.count}</div> `
-		// in SSR is a noop
-		.go(function* timer(part) {
-			for (;;) {
-				part.count++
-				yield* sleep(100)
-				part.count++
-				yield* sleep(500)
-			}
-		})
+   /**
+    * $.count (no args) → returns the setter object as usual
+    * $.count('0') (with arg) → sets initial value AND returns the setter object
+    */
+   h.div($.count("0"))
+      // in SSR is a noop
+      .go(function* timer(part) {
+         for (;;) {
+            part.count++
+            yield* sleep(100)
+            part.count++
+            yield* sleep(500)
+         }
+      })
 }
 
 /* Focus on render */
 function FocusInput() {
-	html`<input id="input" type="text" />`.onClient((part) => {
-		part.elems.input.focus()
-	})
+   input({
+      id: "input",
+      type: "text",
+   }).onClient((part) => {
+      part.elems.input.focus()
+   })
 }
