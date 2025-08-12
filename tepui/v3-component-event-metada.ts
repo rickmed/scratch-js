@@ -1,4 +1,4 @@
-// Since you can get the arguments passed to EmailInput to 
+// Whatever argument you pass to component will be available (typed) at first arg cb in on()
 
 function ContactForm() {
    const contacts = Store([])

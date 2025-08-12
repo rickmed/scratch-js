@@ -1,94 +1,44 @@
-// App.tsx
-import React from "react"
-import { useForm, FormProvider, useFormContext } from "react-hook-form"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
+// === src/components/Footer.js ===
+import { footer, span, strong, button } from 'tepui';
+import { Loading }                      from './Loading.js';
+import { getTodosStore }                from '../todosStore.js';
+import { getFilterStore }               from '../filterStore.js';
 
-const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email"),
-  role: z.enum(["admin", "user"]),
-})
+export async function* Footer() {
+  const { todos, ready: todosReady }       = getTodosStore();
+  const { selected, ready: filterReady }   = getFilterStore();
+  const slot = allocateSlotId();
 
-type FormData = z.infer<typeof schema>
+  // placeholder
+  html`<div data-tp-slot="${slot}">${Loading('Loading footer…')}</div>`;
 
-export default function App() {
-  const methods = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", role: "user" },
-  })
+  // wait for both stores
+  await Promise.all([todosReady, filterReady]);
 
-  const onSubmit = (data: FormData) => {
-    console.log("✅ Submitted:", data)
-  }
+  html`
+    <template data-tp-slot="${slot}">
+      ${(() => {
+        const list        = todos();
+        const activeCount = list.filter(t => !t.completed).length;
+        const completed   = list.length - activeCount;
 
-  return (
-    <div style={{ padding: "2rem" }}>
-      <h2>User Form</h2>
-      <FormProvider {...methods}>
-        <form onSubmit={methods.handleSubmit(onSubmit)} noValidate>
-          <InputField name="name" label="Name" />
-          <InputField name="email" label="Email" />
-          <SelectField name="role" label="Role" options={["admin", "user"]} />
-          <button type="submit">Submit</button>
-        </form>
-      </FormProvider>
-    </div>
-  )
-}
-
-
-import { useFormContext } from "react-hook-form"
-
-type Props = {
-  name: string
-  label: string
-}
-
-export function InputField({ name, label }: Props) {
-  const {
-    register,
-    formState: { errors },
-  } = useFormContext()
-
-  return (
-    <div style={{ marginBottom: "1rem" }}>
-      <label>
-        {label}: <input {...register(name)} />
-      </label>
-      <div style={{ color: "red" }}>{errors[name]?.message as string}</div>
-    </div>
-  )
-}
-
-
-import { useFormContext } from "react-hook-form"
-
-type Props = {
-  name: string
-  label: string
-  options: string[]
-}
-
-export function SelectField({ name, label, options }: Props) {
-  const {
-    register,
-    formState: { errors },
-  } = useFormContext()
-
-  return (
-    <div style={{ marginBottom: "1rem" }}>
-      <label>
-        {label}:
-        <select {...register(name)}>
-          {options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div style={{ color: "red" }}>{errors[name]?.message as string}</div>
-    </div>
-  )
+        return footer(
+          { class: 'footer' },
+          span({ class: 'todo-count' },
+            strong({}, `${activeCount}`),
+            ' items left'
+          ),
+          // FilterLinks(selected()) — you could inject your FilterLinks here
+          completed > 0
+            ? button({
+                class: 'clear-completed',
+                onclick: () => {
+                  todos.set(list.filter(t => !t.completed));
+                }
+              }, 'Clear completed')
+            : null
+        );
+      })()}
+    </template>
+  `;
 }

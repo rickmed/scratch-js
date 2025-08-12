@@ -50,45 +50,46 @@ function Footer() {
 function Main() {
    const filter = FilterLinks.Store()
 
-   const header = Header()
-   const footer = Footer()
-   const todos = Todos(filter)
-
-   div({}, header, todos, footer)
+   return h.div(
+		Header,
+		[Todos, filter],
+		Footer
+	)
 }
 
-function Todos(filter: Filter) {
-   const todos = Store([])
-   auto(({ $ }) => {
-      const { selected } = filter
-      const newTodos = todos.filter((t) =>
-         selected == "All"
-            ? t
-            : selected === "Active"
-            ? !t.completed
-            : t.completed
-      )
+function Todos(filter) {
+	const todos = Store([]);
 
-      // has inside old todos, only adds/removes/reorder (todo item change must be inside Todo component)
-      diffAndPatch(newTodos, (todo: Todo) => TodoItem(todo))
-   })
-}
+	return List(newTodos, (todo) => {
+	  return TodoItem(todo)
+		// .on is pretty much just TodoItem._elem.querySelector(`[${deleteElem}]`).addEventListener(...)
+	  	.on(deleteElem, "click", (ev) => {
+			todos.remove(todo);
+		});
+	});
 
-// https://chatgpt.com/c/6892174c-1270-8322-8d87-acede5d5dbf2?model=o4-mini-high
-// todo and event are typed
-// todo is the arg passed to TodoItem
-on(TodoItem, "delete", "click", (todo, ev) => {
-   todosStore.todos = todosStore.todos.filter((t) => t !== todo)
-})
+	function newTodos() {
+	  const { selected } = filter;
+	  return todos.filter((t) =>
+		  selected == "All"
+			  ? t
+			  : selected === "Active"
+			  ? !t.completed
+			  : t.completed
+	  );
+	}
+ }
 
 type Todo = {
    title: string
    completed: boolean
 }
 
+const deleteElem = uuid()
+
 function TodoItem(todo: Todo) {
    return
-   h.li({class: $.class},
+    h.li({class: $.class},
       h.div(
          { class: "view" },
          h.input({
@@ -103,7 +104,7 @@ function TodoItem(todo: Todo) {
             },
             todo.title
          ),
-         h.button({ id: $.delete, class: "destroy" })
+         h.button({class: "destroy", [deleteElem]: ""})
       ),
       h.input({ class: "edit", type: "text" })
 
@@ -145,6 +146,67 @@ function TodoItem(todo: Todo) {
 }
 
 
+/* Event delegation */
+function Todos_event_delegation(filter: Filter) {
+	const todos = Store([])
+
+	const tag = Delegate<Todo>(ul)
+	  .on(deleteElem, "click", (todo, ev) => {
+			todos.remove(todo)
+	  })
+	  .on(toggleTodo, "change", (todo, ev) => {
+			todo.completed = !todo.completed
+	  })
+
+	return List(newTodos, tag(TodoItem))
+
+	function newTodos() {
+	  const { selected } = filter
+	  return todos.filter((t) =>
+		  selected == "All"
+			  ? t
+			  : selected === "Active"
+			  ? !t.completed
+			  : t.completed
+	  )
+	}
+ }
+
+ function Delegate<T>(container: HTMLElement) {
+	const dataUuid = crypto.randomUUID()
+
+	function tag(componentFn: (data: T) => any) {
+		return (data: T) => {
+		  const element = componentFn(data)
+		  element._dom.setAttribute(`data-${dataUuid}`, data)
+		  return element
+		}
+	 }
+
+	function on(kindId: string, eventType: string, handler: (data: T, ev: Event) => void) {
+	  container.addEventListener(eventType, (ev) => {
+		 const target = ev.target as HTMLElement
+		 const kind = target.dataset.kind
+
+		 if (kind !== kindId) return
+
+		 // Find the closest element that has our data
+		 const dataElement = target.closest(`[data-${dataUuid}]`)
+		 if (dataElement) {
+			const todo = (dataElement as HTMLElement).dataset[dataUuid] as T
+			handler(todo, ev)
+		 }
+	  })
+
+	  return tag
+	}
+
+	tag.on = on
+
+	return tag
+ }
+
+
 
 /* Other things */
 
@@ -173,6 +235,6 @@ const TodoView = h.li.template({ class: $.class },
    )
 )
 
-function TodoItem(todo) {
+function TodoItem_withTempalte(todo) {
    return TodoView({ title: todo.title }).auto(...)
 }
