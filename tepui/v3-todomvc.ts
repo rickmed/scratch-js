@@ -85,7 +85,6 @@ type Todo = {
    completed: boolean
 }
 
-const deleteElem = uuid()
 
 function TodoItem(todo: Todo) {
    return
@@ -104,7 +103,7 @@ function TodoItem(todo: Todo) {
             },
             todo.title
          ),
-         h.button({class: "destroy", [deleteElem]: ""})
+         h.button({class: "destroy", $part: "delete"})
       ),
       h.input({ class: "edit", type: "text" })
 
@@ -145,16 +144,21 @@ function TodoItem(todo: Todo) {
    }
 }
 
-
 /* Event delegation */
+
+
+
+
 function Todos_event_delegation(filter: Filter) {
 	const todos = Store([])
 
-	const tag = Delegate<Todo>(ul)
-	  .on(deleteElem, "click", (todo, ev) => {
+	const ul = ctx.mySlot
+
+	const tag = Delegate<Todo>(ul, TodoItem)
+	  .on("delete", "click", (todo, ev) => {
 			todos.remove(todo)
 	  })
-	  .on(toggleTodo, "change", (todo, ev) => {
+	  .on("toggle", "change", (todo, ev) => {
 			todo.completed = !todo.completed
 	  })
 
@@ -172,7 +176,7 @@ function Todos_event_delegation(filter: Filter) {
 	}
  }
 
- function Delegate<T>(container: HTMLElement) {
+ function Delegate<T>(container: HTMLElement, PartCtor: () => Part) {
 	const dataUuid = crypto.randomUUID()
 
 	function tag(componentFn: (data: T) => any) {

@@ -1,157 +1,153 @@
-// --- ids ---
-const emailInputId    = uuid();
-const emailErrorId    = uuid();
-const passwordInputId = uuid();
-const passwordErrorId = uuid();
-const confirmInputId  = uuid();
-const confirmErrorId  = uuid();
-const submitButtonId  = uuid();
-
 // --- Email field ---
 function EmailField() {
-  const root = div({ class: "field" },
-    label("Email"),
-    input({
-      type: "email",
-      placeholder: "Enter your email",
-      [emailInputId]: ""
-    }),
-    div({
-      class: "error",
-      "aria-live": "polite",
-      style: "display:none",
-      [emailErrorId]: ""
-    })
-  );
+   const part = div(
+      { class: "field" },
+      label("Email"),
+      input({
+         type: "email",
+         placeholder: "Enter your email",
+         $part: "input",
+      }),
+      div({
+         class: "error",
+         "aria-live": "polite",
+         style: "display:none",
+         $part: "error",
+      })
+   )
 
-  // elem(): scoped query helper for this component's root
-  const elem = <T extends Element = Element>(id: string) =>
-    root.querySelector<T>(`[${id}]`)!;
+   const { input, error } = part
 
-  const inputEl = elem<HTMLInputElement>(emailInputId);
-  const errEl   = elem<HTMLDivElement>(emailErrorId);
+   function hasError() {
+      return error.style.display !== "none" && error.textContent !== ""
+   }
 
-  const hasError = () =>
-    errEl.style.display !== "none" && errEl.textContent !== "";
+   function showError(message: string) {
+      error.textContent = message
+      error.style.display = "block"
+      input.setAttribute("aria-invalid", "true")
+   }
 
-  const showError = (message: string) => {
-    errEl.textContent = message;
-    errEl.style.display = "block";
-    inputEl.setAttribute("aria-invalid", "true");
-  };
+   function clearError() {
+      if (!hasError()) return
+      error.textContent = ""
+      error.style.display = "none"
+      input.removeAttribute("aria-invalid")
+   }
 
-  const clearError = () => {
-    if (!hasError()) return;
-    errEl.textContent = "";
-    errEl.style.display = "none";
-    inputEl.removeAttribute("aria-invalid");
-  };
+   input.addEventListener("input", () => {
+      if (hasError()) clearError()
+   })
 
-  // clear only if currently visible
-  inputEl.addEventListener("input", () => { if (hasError()) clearError(); });
-
-  return {
-    showError,
-    clearError,
-    get value() { return inputEl.value.trim(); },
-    get valid() {
-      const v = inputEl.value.trim();
-      return !!v && v.includes("@") && v.includes(".");
-    }
-  };
+   return {
+      input, // expose the target so `on(...)` can bind blur
+      showError,
+      clearError,
+      get value() {
+         return input.value.trim()
+      },
+      get valid() {
+         const v = input.value.trim()
+         return !!v && v.includes("@") && v.includes(".")
+      },
+   }
 }
 
 // --- Password field (Password / Confirm Password) ---
-function PasswordField(labelText: "Password" | "Confirm Password" = "Password") {
-  const inputId = labelText === "Confirm Password" ? confirmInputId : passwordInputId;
-  const errorId = labelText === "Confirm Password" ? confirmErrorId : passwordErrorId;
+function PasswordField(
+   labelText: "Password" | "Confirm Password" = "Password"
+) {
+   const part = div(
+      { class: "field" },
+      label(labelText),
+      input({
+         type: "password",
+         placeholder: `Enter ${labelText.toLowerCase()}`,
+         $part: "input",
+      }),
+      div({
+         class: "error",
+         "aria-live": "polite",
+         style: "display:none",
+         $part: "error",
+      })
+   )
 
-  const root = div({ class: "field" },
-    label(labelText),
-    input({
-      type: "password",
-      placeholder: `Enter ${labelText.toLowerCase()}`,
-      [inputId]: ""
-    }),
-    div({
-      class: "error",
-      "aria-live": "polite",
-      style: "display:none",
-      [errorId]: ""
-    })
-  );
+   const { input, error } = part
 
-  const elem = <T extends Element = Element>(id: string) =>
-    root.querySelector<T>(`[${id}]`)!;
+   function hasError() {
+      return error.style.display !== "none" && error.textContent !== ""
+   }
 
-  const inputEl = elem<HTMLInputElement>(inputId);
-  const errEl   = elem<HTMLDivElement>(errorId);
+   function showError(message: string) {
+      error.textContent = message
+      error.style.display = "block"
+      input.setAttribute("aria-invalid", "true")
+   }
 
-  const hasError = () =>
-    errEl.style.display !== "none" && errEl.textContent !== "";
+   function clearError() {
+      if (!hasError()) return
+      error.textContent = ""
+      error.style.display = "none"
+      input.removeAttribute("aria-invalid")
+   }
 
-  const showError = (message: string) => {
-    errEl.textContent = message;
-    errEl.style.display = "block";
-    inputEl.setAttribute("aria-invalid", "true");
-  };
+   input.addEventListener("input", () => {
+      if (hasError()) clearError()
+   })
 
-  const clearError = () => {
-    if (!hasError()) return;
-    errEl.textContent = "";
-    errEl.style.display = "none";
-    inputEl.removeAttribute("aria-invalid");
-  };
-
-  inputEl.addEventListener("input", () => { if (hasError()) clearError(); });
-
-  return {
-    showError,
-    clearError,
-    get value() { return inputEl.value; },
-    get valid() { return this.value.length >= 8; }
-  };
+   return {
+      input, // expose for `on(...)`
+      showError,
+      clearError,
+      get value() {
+         return input.value
+      },
+      get valid() {
+         return this.value.length >= 8
+      },
+   }
 }
 
-// --- App (expose-object + original on(...) style) ---
+// --- App (expose-object + on($partEl, ...) wiring) ---
 function App() {
-  const part = form({ class: "signup-form" },
-    h2("Create Account"),
+   const part = form(
+      { class: "signup-form" },
+      h2("Create Account"),
+      {
+         emailField: EmailField(),
+         passwordField: PasswordField("Password"),
+         confirmField: PasswordField("Confirm Password"),
+      },
+      button({ type: "submit", $part: "submit" }, "Sign Up")
+   )
 
-    // Expose APIs onto `part` while rendering into this context
-    {
-      emailField:    EmailField(),
-      passwordField: PasswordField("Password"),
-      confirmField:  PasswordField("Confirm Password"),
-    },
+   // same logic as before, but now we pass $parts instead of uuids
+   on(part.emailField.input, "blur", () => {
+      if (!part.emailField.valid)
+         part.emailField.showError("Please enter a valid email")
+   })
 
-    button({ type: "submit", [submitButtonId]: "" }, "Sign Up")
-  );
+   on(part.passwordField.input, "blur", () => {
+      if (!part.passwordField.valid)
+         part.passwordField.showError("Password must be at least 8 characters")
+   })
 
-  // Keep the original wiring style:
-  on(emailInputId, "blur", () => {
-    if (!part.emailField.valid) part.emailField.showError("Please enter a valid email");
-  });
+   on(part.confirmField.input, "blur", () => {
+      if (!part.confirmField.valid) {
+         part.confirmField.showError("Password must be at least 8 characters")
+      } else if (part.confirmField.value !== part.passwordField.value) {
+         part.confirmField.showError("Passwords do not match")
+      }
+   })
 
-  on(passwordInputId, "blur", () => {
-    if (!part.passwordField.valid) part.passwordField.showError("Password must be at least 8 characters");
-  });
+   on(part.submit, "click", (ev) => {
+      ev.preventDefault()
+      console.log("Submitting:", {
+         email: part.emailField.value,
+         password: part.passwordField.value,
+      })
+   })
 
-  on(confirmInputId, "blur", () => {
-    if (!part.confirmField.valid) {
-      part.confirmField.showError("Password must be at least 8 characters");
-    } else if (part.confirmField.value !== part.passwordField.value) {
-      part.confirmField.showError("Passwords do not match");
-    }
-  });
-
-  on(submitButtonId, "click", (ev) => {
-    ev.preventDefault();
-    console.log("Submitting:", {
-      email: part.emailField.value,
-      password: part.passwordField.value,
-    });
-  });
-
-  return part;
+   return part
 }
