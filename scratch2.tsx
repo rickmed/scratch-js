@@ -1,44 +1,79 @@
-// === src/components/Footer.js ===
-import { footer, span, strong, button } from 'tepui';
-import { Loading }                      from './Loading.js';
-import { getTodosStore }                from '../todosStore.js';
-import { getFilterStore }               from '../filterStore.js';
+// app.ts — Tepui-ish example (no routing)
+// Assumes: `h` builds elements, `.auto(fn)` re-runs when tracked reads change.
 
-export async function* Footer() {
-  const { todos, ready: todosReady }       = getTodosStore();
-  const { selected, ready: filterReady }   = getFilterStore();
-  const slot = allocateSlotId();
+import { h } from "tepui"
 
-  // placeholder
-  html`<div data-tp-slot="${slot}">${Loading('Loading footer…')}</div>`;
+// --- Store ------------------------------------------------------
 
-  // wait for both stores
-  await Promise.all([todosReady, filterReady]);
+type Msg = { id: number; from: string; subject: string; body: string; read: boolean }
 
-  html`
-    <template data-tp-slot="${slot}">
-      ${(() => {
-        const list        = todos();
-        const activeCount = list.filter(t => !t.completed).length;
-        const completed   = list.length - activeCount;
+function InboxStore() {
+  const state = {
+    messages: [
+      { id: 1, from: "Alice", subject: "Hi", body: "Hello!", read: false },
+      { id: 2, from: "Bob",   subject: "Update", body: "News…", read: true  },
+      { id: 3, from: "Zoe",   subject: "Ping", body: "Are you there?", read: false },
+    ] as Msg[],
 
-        return footer(
-          { class: 'footer' },
-          span({ class: 'todo-count' },
-            strong({}, `${activeCount}`),
-            ' items left'
-          ),
-          // FilterLinks(selected()) — you could inject your FilterLinks here
-          completed > 0
-            ? button({
-                class: 'clear-completed',
-                onclick: () => {
-                  todos.set(list.filter(t => !t.completed));
-                }
-              }, 'Clear completed')
-            : null
-        );
-      })()}
-    </template>
-  `;
+    markRead(id: number) {
+      const m = state.messages.find(m => m.id === id)
+      if (m && !m.read) m.read = true
+    },
+
+    get unreadCount() {
+      // Tepui should track this read so `.auto` can re-run
+      return state.messages.filter(m => !m.read).length
+    },
+  }
+  return state
+}
+
+const store = InboxStore()
+
+// --- UI ---------------------------------------------------------
+
+function Header(store: ReturnType<typeof InboxStore>) {
+  return h.header(
+    h.nav(
+      h.strong({ id: "unread-count" }, "Unread: ", h.span({ ref: $.count }, "0")),
+    ),
+  ).auto(({ $ }) => {
+    // Keep the counter in sync with store state
+    $.count.textContent = String(store.unreadCount)
+  })
+}
+
+function MessageItem(store: ReturnType<typeof InboxStore>, m: Msg) {
+  return h.li(
+    { class: $.cls },
+    h.span(`${m.from} — ${m.subject}`),
+    h.button(
+      {
+        disabled: $.disabled,
+        onclick: () => store.markRead(m.id),
+        title: "Mark as read",
+      },
+      "✓",
+    ),
+  ).auto(({ $ }) => {
+    $.cls = m.read ? "read" : ""
+    $.disabled = m.read ? true : false
+  })
+}
+
+function InboxList(store: ReturnType<typeof InboxStore>) {
+  return h.section(
+    h.h1("Inbox"),
+    h.ul(
+      // Map current messages to <li> items
+      ...store.messages.map(m => MessageItem(store, m)),
+    ),
+  )
+}
+
+function App() {
+  return h.main(
+    Header(store),
+    InboxList(store),
+  )
 }
