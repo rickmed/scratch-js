@@ -147,8 +147,6 @@ function TodoItem(todo: Todo) {
 /* Event delegation */
 
 
-
-
 function Todos_event_delegation(filter: Filter) {
 	const todos = Store([])
 
