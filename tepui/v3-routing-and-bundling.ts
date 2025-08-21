@@ -249,6 +249,7 @@ function BlogComponent() {
 // environment, and users get fast, cacheable bundles. Simple and effective!
 // File Structure Example:
 // routes/comment.js -> handles "/comment"
+
 export const component = Comment
 export const params = CommentParams
 
@@ -261,6 +262,7 @@ const CommentParams = z.object({
    commentId: z.string(),
    postId: z.string().optional(),
 })
+
 // Development Mode (Lazy Bundling)
 // 1. Startup - Generate Types + Route Manifest:
 
