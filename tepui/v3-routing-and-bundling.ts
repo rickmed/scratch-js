@@ -263,112 +263,29 @@ const CommentParams = z.object({
    postId: z.string().optional(),
 })
 
-// Development Mode (Lazy Bundling)
-// 1. Startup - Generate Types + Route Manifest:
+// routes.js
+import { Routes } from 'tepui';
 
-async function buildRouteManifest() {
-   const routeFiles = await glob("./routes/*.js")
-   const manifest = {}
-   const types = []
-
-   for (const file of routeFiles) {
-      const routeName = fileNameToRoute(file) // comment.js -> comment
-      const module = await import(file)
-
-      manifest[`/${routeName}`] = {
-         file, // './routes/comment.js'
-         params: module.params, // For type generation
-         // Module gets garbage collected
-      }
-
-      const paramType = zodToTypeScript(module.params)
-      types.push(`export function ${routeName}(params: ${paramType}): string;`)
-   }
-
-   writeFile("links.d.ts", types.join("\n"))
-   return manifest
-}
-
-// 2. Request Time - Lazy Bundle:
-async function handleRoute(pathname) {
-   const route = routeManifest[pathname]
-   const cacheKey = `${route.file}-${getFileHash(route.file)}`
-
-   // Check cache first
-   if (bundleCache.has(cacheKey)) {
-      return bundleCache.get(cacheKey)
-   }
-
-   // Import and bundle on-demand
-   const module = await import(route.file)
-   const bundle = await createBundle(route.file)
-
-   bundleCache.set(cacheKey, bundle)
-   return bundle
-}
-
-// Production Mode (Eager Bundling)
-// 1. Startup - Bundle Everything:
-async function buildAll() {
-   const routeFiles = await glob("./routes/*.js")
-   const types = []
-
-   for (const file of routeFiles) {
-      const routeName = fileNameToRoute(file)
-      const module = await import(file)
-
-      // Generate bundle immediately
-      const bundle = await createBundle(file)
-      const hash = hashContent(bundle)
-
-      // Cache to disk/memory
-      await cacheBundle(`${routeName}-${hash}.js`, bundle)
-
-      // Generate types
-      const paramType = zodToTypeScript(module.params)
-      types.push(`export function ${routeName}(params: ${paramType}): string;`)
-   }
-
-   writeFile("links.d.ts", types.join("\n"))
-}
-
-// 2. Request Time - Serve Cached:
-async function handleRoute(pathname) {
-   const routeName = pathnameToRouteName(pathname)
-   return serveCachedBundle(`${routeName}-${hash}.js`)
-}
-
-// Bundler Implementation:
-import * as esbuild from "esbuild"
-
-async function createBundle(entryFile) {
-   const result = await esbuild.build({
-      entryPoints: [entryFile],
-      bundle: true,
-      format: "esm",
-      write: false,
-      minify: true,
-   })
-
-   return result.outputFiles[0].text
-}
-
-// Generated Types Example:
-declare module "tepui/links" {
-   export function comment(params: {
-      commentId: string
-      postId?: string
-   }): string
-   export function userProfile(params: { userId: string }): string
-}
+export const Routes({
+  '/search': {
+    component: () => import('./routes/search.js'),
+    params: z.object({
+      query: z.string().optional(),
+      category: z.string().optional()
+    })
+  },
+  '/post': {
+    component: () => import('./routes/post.js'),
+    params: z.object({
+      id: z.string(),
+      tab: z.string().optional()
+    })
+  }
+})
 
 // Usage in components
-import { comment, userProfile } from "tepui/links"
+import { routes } from './routes.js';
 
-function HomePage() {
-   return h.div(
-      {},
-      h.a({ href: comment({ commentId: "123" }) }, "View Comment"),
-      h.a({ href: userProfile({ userId: "456" }) }, "View Profile")
-   )
-}
+// Proxy intercepts property access and converts to route calls
+routes.search({ query: "bikes" });      // Proxy maps 'search' → '/search'
+routes.post({ id: "123" });             // Proxy maps 'post' → '/post'
