@@ -250,42 +250,80 @@ function BlogComponent() {
 // File Structure Example:
 // routes/comment.js -> handles "/comment"
 
-export const component = Comment
-export const params = CommentParams
-
-function Comment() {
-   const { commentId, postId } = params(CommentParams)
-   return h.div({}, `Comment ${commentId}`)
+// Your component (not important for typing, just here to show it exists)
+export default function Post() {
+   const { id, tab } = Route(Params)
 }
 
-const CommentParams = z.object({
-   commentId: z.string(),
-   postId: z.string().optional(),
+// The ONLY thing we need for types: export the Zod schema object
+export const Params = z.object({
+   id: z.string(),
+   tab: z.string().optional(),
 })
 
 // routes.js
-import { Routes } from 'tepui';
+import type { z } from "zod"
 
-export const Routes({
-  '/search': {
-    component: () => import('./routes/search.js'),
-    params: z.object({
-      query: z.string().optional(),
-      category: z.string().optional()
-    })
-  },
-  '/post': {
-    component: () => import('./routes/post.js'),
-    params: z.object({
-      id: z.string(),
-      tab: z.string().optional()
-    })
-  }
+/**
+ * Infer the plain TS type from a Zod schema object.
+ */
+type InferZod<T> = T extends z.ZodTypeAny ? z.infer<T> : never
+
+/**
+ * Given a loader like: () => import("./routes/post")
+ * extract the module type, then grab its exported `Params` (a Zod object),
+ * and finally infer its runtime shape as a TS type.
+ */
+type ParamsFromLoader<L> = L extends () => Promise<infer M> // M is the module
+   ? M extends { Params: infer P } // pick exported `Params`
+      ? P extends z.ZodTypeAny
+         ? InferZod<P> // z.infer<typeof Params>
+         : never
+      : never
+   : never
+
+/**
+ * The returned `links` object will have one function per route key,
+ * each requiring the *inferred* params type from that module's `Params`.
+ */
+type LinksFor<Config extends Record<string, () => Promise<any>>> = {
+   [K in keyof Config & string]: (params: ParamsFromLoader<Config[K]>) => string
+}
+
+/**
+ * Minimal "router" that only builds typed link functions.
+ * Note: This has *no* runtime dependency on route modules; it uses types only.
+ */
+export function createRoutes<Config extends Record<string, () => Promise<any>>>(
+   config: Config
+) {
+   const links = {} as LinksFor<Config>
+
+   // Optional tiny runtime: build a link by serializing the params.
+   // (This is not relevant to typing; it just shows a plausible shape.)
+   for (const [path] of Object.entries(config)) {
+      const name = (
+         path.startsWith("/") ? path.slice(1) : path
+      ) as keyof LinksFor<Config> & string
+      ;(links as any)[name] = (params: Record<string, unknown>) => {
+         const usp = new URLSearchParams()
+         for (const [k, v] of Object.entries(params ?? {})) {
+            // naive stringification; fine for demo
+            usp.set(k, String(v))
+         }
+         return `${path}?${usp.toString()}`
+      }
+   }
+
+   return { links }
+}
+
+// Notice: we NEVER import the route modules directly here.
+// We only hand createRoutes() dynamic import *functions*.
+const { links } = createRoutes({
+   post: () => import("./scratch2.js"), // <- your route files here
 })
 
-// Usage in components
-import { routes } from './routes.js';
-
-// Proxy intercepts property access and converts to route calls
-routes.search({ query: "bikes" });      // Proxy maps 'search' → '/search'
-routes.post({ id: "123" });             // Proxy maps 'post' → '/post'
+// ✅ Correct usage: types inferred from each module's exported `Params`.
+const a = links.post({ id: "123" }) // tab optional
+// Proxy maps 'post' → '/post'
