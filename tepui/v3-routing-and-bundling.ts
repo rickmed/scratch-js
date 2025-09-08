@@ -325,5 +325,6 @@ const { links } = createRoutes({
 })
 
 // ✅ Correct usage: types inferred from each module's exported `Params`.
-const a = links.post({ id: "123" }) // tab optional
+const a = links.post({ id: "123" })
+// tab optional
 // Proxy maps 'post' → '/post'
