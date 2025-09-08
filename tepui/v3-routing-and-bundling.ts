@@ -321,7 +321,7 @@ export function createRoutes<Config extends Record<string, () => Promise<any>>>(
 // Notice: we NEVER import the route modules directly here.
 // We only hand createRoutes() dynamic import *functions*.
 const { links } = createRoutes({
-   post: () => import("./scratch2.js"), // <- your route files here
+   post: () => import("./v3-some-route.js"), // <- your route files here
 })
 
 // ✅ Correct usage: types inferred from each module's exported `Params`.
