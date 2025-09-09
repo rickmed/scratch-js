@@ -1,330 +1,557 @@
-// Schema
-const CommentParams = z.object({
-   commentId: z.string().optional(),
-   postId: z.string().optional(),
-   category: z.string().optional(),
-})
+/**
+ * File-Based Routing System with Lazy Loading & Type Safety
+ *
+ * Solves the bundle bloat problem of auto-discovery systems by using
+ * centralized route definitions with lazy loading. Heavy route dependencies
+ * only load when routes are actually hit.
+ *
+ * Features:
+ * - Zero bundle bloat (lazy loading)
+ * - Type-safe parameter extraction for basic routes
+ * - Multiple components per file support
+ * - Clean Comp() helper syntax
+ * - Support for React components, vanilla functions, API handlers
+ *
+ * @example
+ * ```typescript
+ * const routes = createRoutes({
+ *   "products/:category/:subcategory": Comp(() => import("./routes/shop.js"), "ProductListing"),
+ *   "cart/:action?": Comp(() => import("./routes/shop.js"), "ShoppingCart"),
+ *   "admin/users/:page?": Comp(() => import("./routes/admin.tsx"), "UserManagement"),
+ * });
+ *
+ * const productUrl = routes.link("products/:category/:subcategory", "electronics", "phones");
+ * ```
+ */
 
-// Component
-function Comment() {
-   const { commentId, postId, category } = params(CommentParams)
+// ==================================================================================
+// TYPE DEFINITIONS
+// ==================================================================================
 
-   if (!commentId && !postId) {
-      return h.div({}, `Category: ${category}`)
+/**
+ * Extracts parameter names from route pattern as tuple
+ * Works for basic patterns like "users/:id" or "products/:category/:subcategory"
+ *
+ * TypeScript limitations:
+ * - Cannot distinguish optional parameters (:param?)
+ * - Cannot handle wildcards (*path)
+ * - Cannot handle mixed patterns
+ */
+type ExtractParams<T extends string> =
+   T extends `${string}:${infer Param}/${infer Rest}`
+      ? [Param, ...ExtractParams<Rest>]
+      : T extends `${string}:${infer Param}`
+      ? [Param]
+      : []
+
+/**
+ * Converts parameter tuple to string array for function parameters
+ */
+type ParamsTuple<T extends readonly string[]> = {
+   [K in keyof T]: string
+}
+
+/**
+ * Route entry - can be original function format or Comp helper result
+ */
+type RouteEntry =
+   | (() => Promise<{ default: Function }>) // Original format
+   | ReturnType<typeof Comp> // Comp helper result
+
+/**
+ * Route configuration object
+ */
+type RouteConfig = {
+   [path: string]: RouteEntry
+}
+
+/**
+ * Extract route parameters for all routes in config
+ */
+type RouteParams<T extends RouteConfig> = {
+   [K in keyof T]: ExtractParams<K & string>
+}
+
+// ==================================================================================
+// COMP HELPER FUNCTION
+// ==================================================================================
+
+/**
+ * Helper function to create clean component route configs
+ * Eliminates verbose .then(m => ({ default: m.ComponentName })) syntax
+ *
+ * @param importFn - Function that returns Promise with module
+ * @param componentName - Optional component name (uses default export if omitted)
+ *
+ * @example
+ * ```typescript
+ * // Named export
+ * Comp(() => import("./routes/shop.js"), "ProductListing")
+ *
+ * // Default export
+ * Comp(() => import("./routes/about.js"))
+ * ```
+ */
+function Comp<T = any>(
+   importFn: () => Promise<T>,
+   componentName?: keyof T
+): { import: () => Promise<T>; component?: string } {
+   return {
+      import: importFn,
+      component: componentName as string,
    }
-
-   if (!commentId) {
-      return h.div({}, `Post: ${postId} in ${category}`)
-   }
-
-   return h.div({}, `Comment ${commentId} on post ${postId}`)
 }
 
-// Registration
-// throws on startup if duplicate strings.
-route(Comment, CommentParams)
-
-// Usage in other components
-Link(Comment, { commentId: "123", postId: "my-post" }, "View Comment")
-
-// 1. Home page - no params
-const HomeParams = z.object({})
-
-function HomePage() {
-   const {} = params(HomeParams)
-   return h.div(
-      { class: "home" },
-      h.h1({}, "Welcome to TodoMVC"),
-      h.p({}, "Organize your tasks efficiently")
-   )
-}
-
-route(HomePage, HomeParams)
-// URL: /homepage or just /
-
-// 2. Todo list with optional filtering
-const TodoListParams = z.object({
-   filter: z.enum(["all", "active", "completed"]).optional(),
-   search: z.string().optional(),
-})
-
-function TodoList() {
-   const { filter, search } = params(TodoListParams)
-
-   return h.div(
-      { class: "todo-list" },
-      h.h2({}, "Your Todos")
-      // Filter and search logic here
-   )
-}
-
-route(TodoList, TodoListParams)
-// URLs:
-// /todolist
-// /todolist?filter=active
-// /todolist?filter=completed&search=groceries
-
-// 3. Individual todo item
-const TodoItemParams = z.object({
-   todoId: z.string(),
-   edit: z.boolean().optional(),
-})
-
-function TodoItem() {
-   const { todoId, edit } = params(TodoItemParams)
-
-   return h.div(
-      { class: "todo-item" },
-      edit ? h.input({}) : h.span({}, `Todo ${todoId}`)
-   )
-}
-
-route(TodoItem, TodoItemParams)
-// URLs:
-// /todoitem?todoId=123
-// /todoitem?todoId=123&edit=true
-
-// 4. User profile with tabs
-const UserProfileParams = z.object({
-   userId: z.string(),
-   tab: z.enum(["profile", "settings", "todos"]).optional(),
-})
-
-function UserProfile() {
-   const { userId, tab = "profile" } = params(UserProfileParams)
-
-   return h.div(
-      { class: "user-profile" },
-      h.h1({}, `User ${userId}`),
-      h.div({ class: `tab-${tab}` }, `${tab} content`)
-   )
-}
-
-route(UserProfile, UserProfileParams)
-// URLs:
-// /userprofile?userId=456
-// /userprofile?userId=456&tab=settings
-// /userprofile?userId=456&tab=todos
-
-// 5. Search results with pagination
-const SearchResultsParams = z.object({
-   query: z.string(),
-   page: z.number().optional(),
-   sortBy: z.enum(["relevance", "date", "title"]).optional(),
-   category: z.string().optional(),
-})
-
-function SearchResults() {
-   const {
-      query,
-      page = 1,
-      sortBy = "relevance",
-      category,
-   } = params(SearchResultsParams)
-
-   return h.div(
-      { class: "search-results" },
-      h.h2({}, `Results for "${query}"`),
-      h.p({}, `Page ${page}, sorted by ${sortBy}`)
-   )
-}
-
-route(SearchResults, SearchResultsParams)
-// URLs:
-// /searchresults?query=javascript
-// /searchresults?query=javascript&page=2&sortBy=date
-// /searchresults?query=javascript&category=tutorials&page=3
-
-// 6. Complex e-commerce product page
-const ProductPageParams = z.object({
-   productId: z.string(),
-   variant: z.string().optional(),
-   color: z.string().optional(),
-   size: z.string().optional(),
-   reviewsPage: z.number().optional(),
-})
-
-function ProductPage() {
-   const { productId, variant, color, size, reviewsPage } =
-      params(ProductPageParams)
-
-   return h.div(
-      { class: "product-page" },
-      h.h1({}, `Product ${productId}`),
-      variant && h.span({}, `Variant: ${variant}`),
-      color && h.span({}, `Color: ${color}`)
-   )
-}
-
-route(ProductPage, ProductPageParams)
-// URLs:
-// /productpage?productId=abc123
-// /productpage?productId=abc123&variant=deluxe&color=red&size=large
-// /productpage?productId=abc123&reviewsPage=2
-
-/* Route Params
-
-Arrays: Comma-separated (tags=a,b,c)
-Nested Objects: Explicit dot notation (user.name=john)
-Complex Data: Force component to flatten it themselves
-
-✅ SEO friendly (no encoded characters)
-✅ Human readable
-✅ Copy-pasteable
-✅ Simple parsing (split on comma, split on dot)
-✅ Component decides its own serialization strategy
-
-If a component needs deeply nested state, they should either flatten it
-explicitly or rethink if it belongs in the URL. Most URL-worthy state is
-pretty flat anyway.
-
-Use cases for component base URL params
-
-Real-World Examples You're Thinking Of:
-GitHub:
-/repo/issues?assignee=john&milestone=v2.0&sort=updated&page=3
-
-Issues component needs: assignee, milestone
-Pagination component needs: page
-Sort component needs: sort
-
-Google Maps:
-/maps?location=nyc&zoom=12&layer=traffic&sidebar=directions
-
-Map component needs: location, zoom, layer
-Sidebar component needs: sidebar state
-
-E-commerce:
-/products?category=shoes&brand=nike&price=50-200&page=2&view=grid
-
-Filter component needs: category, brand, price
-Pagination needs: page
-View component needs: view
-
-*/
-
-// Component just declares what it needs
-function BlogComponent() {
-   const state = params("blog", {
-      category: "tech", // string
-      tags: ["js", "react"], // array → comma-separated
-      "filter.price": "50-200", // nested → explicit key
-      "user.id": "123", // nested → explicit key
-   })
-}
-
-// ?blog.category=tech&blog.tags=js,react&blog.filter.price=50-200&blog.user.id=123
-
-/**** Bundling *****/
-
-// Bundling Strategy Summary
-//
-// File Structure:
-// - One route per file: routes/comment.js → /comment route
-// - Standard exports: Each route file exports component and params
-// - Type generation: Framework scans all route files to generate links.d.ts
-//
-// Development Mode (Lazy Bundling):
-// - Startup: Import all routes to generate types + route manifest, then discard modules
-// - Request time: Lazy import + bundle on-demand using esbuild
-// - Caching: Memory + disk cache with content hashing for cache busting
-// - Hot reload: File watcher invalidates caches when routes change
-//
-// Production Mode (Eager Bundling):
-// - Startup: Import all routes + bundle everything upfront
-// - Request time: Serve pre-built cached bundles
-// - Optimization: All bundles ready immediately, no request-time CPU cost
-//
-// Key Benefits:
-// - No chicken-and-egg: Route manifest built from filesystem scan
-// - Typed links: Auto-generated links.d.ts from Zod schemas
-// - Cache-friendly: Content hashing for proper browser caching across deployments
-// - No waterfalls: Single bundle per route includes all dependencies
-// - Flexible: Lazy (dev) vs eager (prod) bundling modes
-//
-// Bundle Flow:
-// routes/comment.js → Import for types → Bundle with deps → Cache as comment-{hash}.js → Serve
-//
-// The filesystem becomes your route registry, bundling happens at the right time for each
-// environment, and users get fast, cacheable bundles. Simple and effective!
-// File Structure Example:
-// routes/comment.js -> handles "/comment"
-
-// Your component (not important for typing, just here to show it exists)
-export default function Post() {
-   const { id, tab } = Route(Params)
-}
-
-// The ONLY thing we need for types: export the Zod schema object
-export const Params = z.object({
-   id: z.string(),
-   tab: z.string().optional(),
-})
-
-// routes.js
-import type { z } from "zod"
+// ==================================================================================
+// MAIN ROUTING SYSTEM
+// ==================================================================================
 
 /**
- * Infer the plain TS type from a Zod schema object.
+ * Creates a routing system with type-safe parameter extraction and lazy loading
+ *
+ * @param routes - Route configuration object mapping patterns to components
+ * @returns Object with matchRoute and link functions
  */
-type InferZod<T> = T extends z.ZodTypeAny ? z.infer<T> : never
+function createRoutes<T extends RouteConfig>(routes: T) {
+   type RouteMap = RouteParams<T>
+   type RoutePaths = keyof T & string
 
-/**
- * Given a loader like: () => import("./routes/post")
- * extract the module type, then grab its exported `Params` (a Zod object),
- * and finally infer its runtime shape as a TS type.
- */
-type ParamsFromLoader<L> = L extends () => Promise<infer M> // M is the module
-   ? M extends { Params: infer P } // pick exported `Params`
-      ? P extends z.ZodTypeAny
-         ? InferZod<P> // z.infer<typeof Params>
-         : never
-      : never
-   : never
+   // ================================================================================
+   // ROUTE NORMALIZATION
+   // ================================================================================
 
-/**
- * The returned `links` object will have one function per route key,
- * each requiring the *inferred* params type from that module's `Params`.
- */
-type LinksFor<Config extends Record<string, () => Promise<any>>> = {
-   [K in keyof Config & string]: (params: ParamsFromLoader<Config[K]>) => string
-}
-
-/**
- * Minimal "router" that only builds typed link functions.
- * Note: This has *no* runtime dependency on route modules; it uses types only.
- */
-export function createRoutes<Config extends Record<string, () => Promise<any>>>(
-   config: Config
-) {
-   const links = {} as LinksFor<Config>
-
-   // Optional tiny runtime: build a link by serializing the params.
-   // (This is not relevant to typing; it just shows a plausible shape.)
-   for (const [path] of Object.entries(config)) {
-      const name = (
-         path.startsWith("/") ? path.slice(1) : path
-      ) as keyof LinksFor<Config> & string
-      ;(links as any)[name] = (params: Record<string, unknown>) => {
-         const usp = new URLSearchParams()
-         for (const [k, v] of Object.entries(params ?? {})) {
-            // naive stringification; fine for demo
-            usp.set(k, String(v))
+   /**
+    * Normalize different route config formats to standard loader format
+    */
+   const normalizedRoutes = Object.fromEntries(
+      Object.entries(routes).map(([path, config]) => {
+         if (typeof config === "function") {
+            // Original format: () => Promise<{ default: Function }>
+            return [path, { loader: config }]
+         } else {
+            // Comp helper result: { import: ..., component?: ... }
+            const loader = config.component
+               ? () =>
+                    config
+                       .import()
+                       .then((module) => ({
+                          default: module[config.component!],
+                       }))
+               : config.import
+            return [path, { loader }]
          }
-         return `${path}?${usp.toString()}`
+      })
+   )
+
+   // ================================================================================
+   // ROUTE COMPILATION
+   // ================================================================================
+
+   /**
+    * Compile route patterns into regex matchers with parameter extraction
+    * Supports:
+    * - Basic parameters: :param
+    * - Optional parameters: :param?
+    * - Wildcards: *param
+    * - Mixed patterns: :required/*rest
+    */
+   function compileRoute(pattern: string) {
+      let regex = pattern
+      const paramNames: string[] = []
+      const paramTypes: ("required" | "optional" | "wildcard")[] = []
+
+      // Handle optional parameters :param?
+      regex = regex.replace(/:([^/?]+)\?/g, (_, param) => {
+         paramNames.push(param)
+         paramTypes.push("optional")
+         return "([^/]*)?" // Optional capture group
+      })
+
+      // Handle required parameters :param
+      regex = regex.replace(/:([^/?]+)/g, (_, param) => {
+         paramNames.push(param)
+         paramTypes.push("required")
+         return "([^/]+)" // Required capture group
+      })
+
+      // Handle wildcards *param
+      regex = regex.replace(/\*([^/]*)/g, (_, param) => {
+         paramNames.push(param || "rest")
+         paramTypes.push("wildcard")
+         return "(.*)" // Capture everything
+      })
+
+      return {
+         regex: new RegExp(`^${regex}$`),
+         paramNames,
+         paramTypes,
       }
    }
 
-   return { links }
+   const compiledRoutes = Object.entries(normalizedRoutes).map(
+      ([pattern, { loader }]) => ({
+         pattern,
+         compiled: compileRoute(pattern),
+         loader,
+      })
+   )
+
+   // ================================================================================
+   // ROUTE MATCHING
+   // ================================================================================
+
+   /**
+    * Match incoming path against compiled routes and load handler
+    *
+    * @param path - URL path to match (e.g., "/products/electronics/phones")
+    * @returns Promise resolving to { handler, params } or null if no match
+    *
+    * @example
+    * ```typescript
+    * const match = await matchRoute("/products/electronics/phones");
+    * if (match) {
+    *   const result = match.handler(match.params);
+    * }
+    * ```
+    */
+   async function matchRoute(path: string) {
+      for (const route of compiledRoutes) {
+         const match = path.match(route.compiled.regex)
+         if (match) {
+            const params: any = {}
+
+            // Extract parameters based on their types
+            route.compiled.paramNames.forEach((name, i) => {
+               const value = match[i + 1]
+               const type = route.compiled.paramTypes[i]
+
+               if (type === "wildcard") {
+                  // *path becomes array of path segments
+                  params[name] = value ? value.split("/").filter(Boolean) : []
+               } else if (type === "optional") {
+                  // :param? can be undefined
+                  params[name] = value || undefined
+               } else {
+                  // :param is always string
+                  params[name] = value
+               }
+            })
+
+            // Load the route handler module
+            const module = await route.loader()
+            return { handler: module.default, params }
+         }
+      }
+      return null
+   }
+
+   // ================================================================================
+   // LINK GENERATION
+   // ================================================================================
+
+   /**
+    * Generate type-safe URLs from route patterns and parameters
+    *
+    * TypeScript provides full type safety for basic parameter routes.
+    * Advanced routes (optional params, wildcards) require manual typing.
+    *
+    * @param path - Route pattern (must match a key in route config)
+    * @param params - Parameters in order they appear in pattern
+    * @returns Generated URL string
+    *
+    * @example
+    * ```typescript
+    * // Basic routes (fully typed)
+    * const userUrl = link("users/:id", "123");
+    * const productUrl = link("products/:category/:subcategory", "electronics", "phones");
+    *
+    * // Advanced routes (manual typing needed)
+    * const blogUrl = link("blog/:slug/:page?" as any, "my-post", "2");
+    * const fileUrl = link("files/*path" as any, ["docs", "guide.pdf"] as any);
+    * ```
+    */
+   function link<P extends RoutePaths>(
+      path: P,
+      ...params: ParamsTuple<RouteMap[P]>
+   ): string {
+      let result = path
+      let paramIndex = 0
+
+      // Replace optional parameters :param?
+      result = result.replace(/:([^/?]+)\?/g, () => {
+         const value = params[paramIndex++]
+         return value !== undefined ? value : ""
+      })
+
+      // Replace required parameters :param
+      result = result.replace(/:([^/?]+)/g, () => {
+         return params[paramIndex++] || ""
+      })
+
+      // Replace wildcards *param
+      result = result.replace(/\*[^/]*/g, () => {
+         const value = params[paramIndex++] as any
+         return Array.isArray(value) ? value.join("/") : value || ""
+      })
+
+      return result
+   }
+
+   // ================================================================================
+   // RETURN PUBLIC API
+   // ================================================================================
+
+   return {
+      matchRoute,
+      link,
+      // Internal for debugging
+      _internal: {
+         compiledRoutes,
+         normalizedRoutes,
+      },
+   }
 }
 
-// Notice: we NEVER import the route modules directly here.
-// We only hand createRoutes() dynamic import *functions*.
-const { links } = createRoutes({
-   post: () => import("./v3-some-route.js"), // <- your route files here
+// ==================================================================================
+// USAGE EXAMPLES
+// ==================================================================================
+
+/**
+ * Example route configuration showing various patterns
+ */
+const exampleRoutes = createRoutes({
+   // ================================================================================
+   // BASIC ROUTES (Fully TypeScript typed)
+   // ================================================================================
+
+   // Simple routes with no parameters
+   about: () => import("./routes/about.js"),
+   contact: () => import("./routes/contact.js"),
+
+   // Single parameter routes
+   "users/:id": Comp(() => import("./routes/user.js"), "UserProfile"),
+   "blog/:slug": Comp(() => import("./routes/blog.js"), "BlogPost"),
+
+   // Multiple parameter routes
+   "products/:category/:subcategory": Comp(
+      () => import("./routes/shop.js"),
+      "ProductListing"
+   ),
+   "admin/:section/:page": Comp(() => import("./routes/admin.js"), "AdminPage"),
+
+   // ================================================================================
+   // MULTIPLE COMPONENTS FROM SAME FILE
+   // ================================================================================
+
+   // Shop-related routes sharing heavy e-commerce dependencies
+   "cart/:action?": Comp(() => import("./routes/shop.js"), "ShoppingCart"),
+   "checkout/:step?": Comp(() => import("./routes/shop.js"), "CheckoutFlow"),
+   "orders/:userId/:orderId?": Comp(
+      () => import("./routes/shop.js"),
+      "OrderHistory"
+   ),
+
+   // Admin routes sharing admin UI components
+   "admin/users/:page?": Comp(
+      () => import("./routes/admin.js"),
+      "UserManagement"
+   ),
+   "admin/settings/:section?": Comp(
+      () => import("./routes/admin.js"),
+      "AdminSettings"
+   ),
+   "admin/analytics/:timeframe?": Comp(
+      () => import("./routes/admin.js"),
+      "AdminAnalytics"
+   ),
+
+   // ================================================================================
+   // REACT COMPONENTS
+   // ================================================================================
+
+   // React components with TypeScript
+   "dashboard/:widget?": Comp(
+      () => import("./routes/dashboard.tsx"),
+      "DashboardHome"
+   ),
+   "profile/:userId/edit": Comp(
+      () => import("./routes/user-profile.tsx"),
+      "ProfileEditor"
+   ),
+   "settings/:tab?": Comp(
+      () => import("./routes/settings.tsx"),
+      "SettingsPage"
+   ),
+
+   // ================================================================================
+   // API ENDPOINTS
+   // ================================================================================
+
+   // API handlers from same file
+   "api/users/:id": Comp(() => import("./routes/api.js"), "UserAPI"),
+   "api/products/:category": Comp(
+      () => import("./routes/api.js"),
+      "ProductAPI"
+   ),
+   "api/orders/:userId": Comp(() => import("./routes/api.js"), "OrderAPI"),
+
+   // ================================================================================
+   // ADVANCED PATTERNS (Limited TypeScript support)
+   // ================================================================================
+
+   // Optional parameters - manual typing needed
+   "blog/:slug/:page?": Comp(() => import("./routes/blog.js"), "BlogPost"),
+
+   // Wildcards - manual typing needed
+   "files/*path": Comp(() => import("./routes/file-browser.js"), "FileBrowser"),
+   "docs/*sections": Comp(
+      () => import("./routes/documentation.js"),
+      "DocsViewer"
+   ),
+
+   // Mixed patterns - manual typing needed
+   "users/:id/files/*path": Comp(
+      () => import("./routes/user-files.js"),
+      "UserFileBrowser"
+   ),
+
+   // Catch-all route (put last)
+   "*notFound": Comp(() => import("./routes/404.js"), "NotFoundPage"),
 })
 
-// ✅ Correct usage: types inferred from each module's exported `Params`.
-const a = links.post({ id: "123" })
-// tab optional
-// Proxy maps 'post' → '/post'
+// ================================================================================
+// TYPE-SAFE LINK GENERATION EXAMPLES
+// ================================================================================
+
+const { link } = exampleRoutes
+
+// ✅ Fully typed - TypeScript knows parameter requirements
+const userUrl = link("users/:id", "123")
+const productUrl = link(
+   "products/:category/:subcategory",
+   "electronics",
+   "phones"
+)
+const adminUrl = link("admin/:section/:page", "users", "1")
+
+// ❌ TypeScript errors - wrong parameter count
+// const badUrl1 = link("users/:id"); // Missing required parameter
+// const badUrl2 = link("users/:id", "123", "extra"); // Too many parameters
+
+// ⚠️ Advanced routes need manual typing (but work at runtime)
+const blogUrl = link("blog/:slug/:page?" as any, "my-post", "2")
+const fileUrl = link("files/*path" as any, ["documents", "report.pdf"] as any)
+
+// ================================================================================
+// HELPER FUNCTIONS FOR ADVANCED ROUTES
+// ================================================================================
+
+/**
+ * Type-safe helpers for advanced route patterns
+ * Since TypeScript can't infer complex patterns, create manual helpers
+ */
+
+function blogLink(slug: string, page?: string): string {
+   return link("blog/:slug/:page?" as any, slug, page as any)
+}
+
+function fileLink(path: string[]): string {
+   return link("files/*path" as any, path as any)
+}
+
+function userFileLink(userId: string, path: string[]): string {
+   return link("users/:id/files/*path" as any, userId, path as any)
+}
+
+// Usage with proper typing
+const typedBlogUrl = blogLink("my-post", "2")
+const typedFileUrl = fileLink(["docs", "guide.pdf"])
+const typedUserFileUrl = userFileLink("123", ["photos", "vacation.jpg"])
+
+// ================================================================================
+// RUNTIME USAGE EXAMPLE
+// ================================================================================
+
+/**
+ * Example request handler using the routing system
+ */
+async function handleRequest(path: string): Promise<string> {
+   const match = await exampleRoutes.matchRoute(path)
+
+   if (match) {
+      try {
+         // Call the matched route handler with extracted parameters
+         const result = await match.handler(match.params)
+         return result
+      } catch (error) {
+         console.error("Route handler error:", error)
+         return '<div class="error">Internal Server Error</div>'
+      }
+   }
+
+   // No route matched
+   return '<div class="error">404 - Page Not Found</div>'
+}
+
+// Example usage:
+// handleRequest("/products/electronics/phones")
+// → Loads ./routes/shop.js, calls ProductListing({ category: "electronics", subcategory: "phones" })
+
+// handleRequest("/users/123")
+// → Loads ./routes/user.js, calls UserProfile({ id: "123" })
+
+// handleRequest("/files/documents/report.pdf")
+// → Loads ./routes/file-browser.js, calls FileBrowser({ path: ["documents", "report.pdf"] })
+
+// ==================================================================================
+// EXPORTS
+// ==================================================================================
+
+export {
+   createRoutes,
+   Comp,
+   type RouteConfig,
+   type RouteEntry,
+   type ExtractParams,
+   type ParamsTuple,
+}
+
+// ==================================================================================
+// FILE STRUCTURE EXAMPLE
+// ==================================================================================
+
+/**
+ * Example file structure for routes:
+ *
+ * routes/
+ * ├── shop.js              # ProductListing, ShoppingCart, CheckoutFlow, OrderHistory
+ * ├── admin.js             # UserManagement, AdminSettings, AdminAnalytics, AdminPage
+ * ├── blog.js              # BlogPost, BlogEditor, BlogArchive
+ * ├── user.js              # UserProfile, UserSettings
+ * ├── dashboard.tsx        # DashboardHome, DashboardWidget (React)
+ * ├── user-profile.tsx     # ProfileEditor, ProfileViewer (React)
+ * ├── settings.tsx         # SettingsPage (React)
+ * ├── api.js               # UserAPI, ProductAPI, OrderAPI
+ * ├── file-browser.js      # FileBrowser, FileUploader
+ * ├── documentation.js     # DocsViewer, DocsSearch
+ * ├── user-files.js        # UserFileBrowser, UserFileUploader
+ * ├── about.js             # About page (default export)
+ * ├── contact.js           # Contact page (default export)
+ * └── 404.js               # NotFoundPage (default export)
+ *
+ * main.js:
+ * import { createRoutes, Comp } from './routing-system.js';
+ *
+ * const routes = createRoutes({
+ *   // Heavy dependencies only load when routes are hit
+ *   "products/:category/:subcategory": Comp(() => import("./routes/shop.js"), "ProductListing"),
+ *   "cart/:action?": Comp(() => import("./routes/shop.js"), "ShoppingCart"),
+ *   // ... more routes
+ * });
+ *
+ * // Handle incoming requests
+ * app.use(async (req, res) => {
+ *   const result = await handleRequest(req.path);
+ *   res.send(result);
+ * });
+ */
