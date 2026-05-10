@@ -15,7 +15,9 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "effect": "^3.16.7",
+    "groq-sdk": "^1.1.2",
     "mitata": "^1.0.34",
+    "quickjs-emscripten": "^0.31.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "zod": "^4.1.3"
